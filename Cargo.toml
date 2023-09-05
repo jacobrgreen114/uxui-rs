@@ -4,6 +4,12 @@ description = "A cross-platform UI framework"
 version = "0.0.1-alpha"
 authors = [ "Jacob Green" ]
 license = "Apache-2.0"
-license-file = "LICENSE"
 readme = "README.md"
 
+[dependencies]
+winit = "0.28"
+wgpu = "0.17"
+
+[[bin]]
+name = "uxui-example"
+path = "examples/basic/src/main.rs"
