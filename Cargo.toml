@@ -1,5 +1,6 @@
 [package]
 name = "uxui"
+description = "A cross-platform UI framework"
 version = "0.0.1-alpha"
 authors = [ "Jacob Green" ]
 license = "Apache-2.0"
