@@ -1,9 +1,7 @@
 #![windows_subsystem = "windows"]
 
 extern crate uxui;
-extern crate winit;
 
-use std::thread::sleep;
 use uxui::*;
 
 struct ExampleWindowController {}
