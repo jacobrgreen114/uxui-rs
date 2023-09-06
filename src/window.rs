@@ -125,8 +125,6 @@ where
         let window = config.to_builder().build(event_loop).unwrap();
         let surface = unsafe { get_instance().create_surface(&window).unwrap() };
 
-        controller.on_create(&mut Window::new(&window));
-
         let mut s = Self {
             window: Some(window),
             surface: Some(surface),
@@ -134,6 +132,8 @@ where
             controller,
         };
         s.redraw_requested();
+        s.controller
+            .on_create(&mut Window::new(&s.window.as_ref().unwrap()));
         Box::new(s)
     }
 
