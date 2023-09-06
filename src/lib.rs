@@ -1,10 +1,18 @@
+extern crate glm;
+extern crate inline_spirv;
+extern crate num_traits;
+extern crate wgpu;
+extern crate winit;
+
 mod application;
+pub mod controls;
+mod drawing;
+mod gfx;
+pub mod layouts;
 mod window;
 
 pub use application::*;
 pub use window::*;
-
-extern crate winit;
 
 pub enum BindableString<'a> {
     Static(&'a str),
@@ -12,12 +20,20 @@ pub enum BindableString<'a> {
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Size {
-    width: u32,
-    height: u32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Point {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Rect {
+    pub pos: Point,
+    pub size: Size,
+}
+
+pub struct Widget {}

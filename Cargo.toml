@@ -9,7 +9,11 @@ repository = "https://github.com/jacobrgreen114/uxui-rs"
 
 [dependencies]
 winit = "0.28"
-wgpu = "0.17"
+wgpu = { version = "0.17", features = ["default", "spirv"] }
+glm = "0.2"
+inline-spirv = "0.1"
+futures = "0.3"
+num-traits = "0.2"
 
 [[bin]]
 name = "uxui-example"

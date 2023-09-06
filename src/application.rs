@@ -149,7 +149,7 @@ impl<'a> Application<'a> {
                 Event::Resumed => {}
                 Event::MainEventsCleared => {}
                 Event::RedrawRequested(window_id) => {
-                    if let Some(window) = app.windows.get(&window_id) {
+                    if let Some(window) = app.windows.get_mut(&window_id) {
                         window.redraw_requested();
                     } else {
                         panic!("Redraw requested for unknown window");

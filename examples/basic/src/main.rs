@@ -12,16 +12,16 @@ impl WindowController for ExampleWindowController {
     }
 
     fn on_create(&mut self, window: &mut Window) {
-        println!("Window created");
+        // println!("Window created");
         window.show();
     }
 
-    fn on_resize(&mut self, size: Size) {
-        println!("Window resized to {:?}", size);
+    fn on_resize(&mut self, _size: Size) {
+        // println!("Window resized to {:?}", size);
     }
 
-    fn on_moved(&mut self, pos: Point) {
-        println!("Window moved to {:?}", pos);
+    fn on_moved(&mut self, _pos: Point) {
+        // println!("Window moved to {:?}", pos);
     }
 }
 
@@ -36,6 +36,10 @@ impl ApplicationController for ExampleAppController {
         println!("Application started");
         app.create_window::<ExampleWindowController>(&WindowConfig {
             title: Some("Example Window"),
+            size: Some(Size {
+                width: 1280,
+                height: 720,
+            }),
             ..Default::default()
         });
     }
