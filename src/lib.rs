@@ -10,9 +10,11 @@ mod drawing;
 mod gfx;
 pub mod layouts;
 mod window;
+mod component;
 
 pub use application::*;
 pub use window::*;
+pub use component::*;
 
 pub enum BindableString<'a> {
     Static(&'a str),

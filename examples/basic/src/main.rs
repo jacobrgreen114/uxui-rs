@@ -2,6 +2,8 @@
 
 extern crate uxui;
 
+use uxui::controls::*;
+use uxui::layouts::*;
 use uxui::*;
 
 struct ExampleWindowController {}
@@ -12,7 +14,8 @@ impl WindowController for ExampleWindowController {
     }
 
     fn on_create(&mut self, window: &mut Window) {
-        // println!("Window created");
+        let text = Text::new("Hello World!");
+
         window.show();
     }
 

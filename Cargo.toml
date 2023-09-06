@@ -18,3 +18,4 @@ num-traits = "0.2"
 [[bin]]
 name = "uxui-example"
 path = "examples/basic/src/main.rs"
+
