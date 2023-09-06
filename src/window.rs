@@ -231,44 +231,22 @@ where
                     height: 700,
                 },
             },
-            Vec4::new(0.0, 0.0, 1.0, 1.0),
+            Vec4::new(1.0, 0.0, 1.0, 1.0),
         );
 
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Uxui Render Info Buffer"),
-            size: std::mem::size_of::<UniformRenderInfo>() as u64,
-            usage: BufferUsages::UNIFORM,
-            mapped_at_creation: true,
-        });
+        let size = self.window.as_ref().unwrap().inner_size();
 
-        let buffer_slice = buffer.slice(..);
-
-        let data = UniformRenderInfo {
-            projection: orthographic2d(
-                0.0,
-                texture.texture.width() as f32,
-                texture.texture.height() as f32,
-                0.0,
-            ),
-            view: look_at(
-                vec3(0.0, 0.0, 0.0),
-                vec3(0.0, 0.0, -1.0),
-                vec3(0.0, -1.0, 0.0),
-            ),
-        };
-
-        buffer_slice
-            .get_mapped_range_mut()
-            .copy_from_slice(unsafe { any_as_u8_slice(&data) });
-
-        buffer.unmap();
+        let buffer = UniformBuffer::new_initialized(UniformRenderInfo::new(Size {
+            width: size.width,
+            height: size.height,
+        }));
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Uxui Render Info Bind Group"),
             layout: get_uniform_binding_layout(),
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: BindingResource::Buffer(buffer.as_entire_buffer_binding()),
+                resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
             }],
         });
 
@@ -336,4 +314,22 @@ fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f3
 struct UniformRenderInfo {
     projection: Mat4,
     view: Mat4,
+}
+
+impl UniformRenderInfo {
+    fn new(render_area: Size) -> Self {
+        Self {
+            projection: orthographic2d(
+                0.0,
+                render_area.width as f32,
+                render_area.height as f32,
+                0.0,
+            ),
+            view: look_at(
+                vec3(0.0, 0.0, 0.0),
+                vec3(0.0, 0.0, -1.0),
+                vec3(0.0, -1.0, 0.0),
+            ),
+        }
+    }
 }

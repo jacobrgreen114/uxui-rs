@@ -1,6 +1,7 @@
 use crate::gfx::*;
 
 use std::mem::size_of;
+use std::ops::Deref;
 
 use glm::ext::*;
 use glm::*;
@@ -25,6 +26,75 @@ impl<'a> DrawingContext<'a> {
     }
 }
 
+pub struct UniformBuffer<T>
+where
+    T: Sized,
+{
+    buffer: Buffer,
+    phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> UniformBuffer<T>
+where
+    T: Sized,
+{
+    pub fn new() -> Self {
+        let buffer = get_device().create_buffer(&BufferDescriptor {
+            label: Some("Uxui Uniform Buffer"),
+            size: size_of::<T>() as u64,
+            usage: BufferUsages::UNIFORM,
+            mapped_at_creation: false,
+        });
+
+        Self {
+            buffer,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn new_initialized(data: T) -> Self {
+        let buffer = get_device().create_buffer(&BufferDescriptor {
+            label: Some("Uxui Uniform Buffer"),
+            size: size_of::<T>() as u64,
+            usage: BufferUsages::UNIFORM,
+            mapped_at_creation: true,
+        });
+
+        let buffer_slice = buffer.slice(..);
+
+        let mapped_data = buffer_slice.get_mapped_range_mut().as_ptr() as *mut T;
+        unsafe {
+            *mapped_data = data;
+        }
+        buffer.unmap();
+
+        Self {
+            buffer,
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> AsRef<Buffer> for UniformBuffer<T>
+where
+    T: Sized,
+{
+    fn as_ref(&self) -> &Buffer {
+        &self.buffer
+    }
+}
+
+fn model_projection(rect: Rect, rotation: f32) -> Mat4 {
+    let mut mat = Mat4::one();
+    mat = translate(&mat, vec3(rect.pos.x as f32, rect.pos.y as f32, 0.0));
+    mat = rotate(&mat, rotation, vec3(0.0, 0.0, 1.0));
+    mat = scale(
+        &mat,
+        vec3(rect.size.width as f32, rect.size.height as f32, 0.0),
+    );
+    mat
+}
+
 #[repr(packed)]
 #[allow(dead_code)]
 struct RectangleUniform {
@@ -34,7 +104,7 @@ struct RectangleUniform {
 
 #[allow(dead_code)]
 pub struct Rectangle {
-    buffer: Buffer,
+    buffer: UniformBuffer<RectangleUniform>,
     bind_group: BindGroup,
 }
 
@@ -42,64 +112,21 @@ pub(crate) unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     std::slice::from_raw_parts((p as *const T) as *const u8, std::mem::size_of::<T>())
 }
 
-fn model_projection(rect: Rect, rotation: f32) -> Mat4 {
-    //let mat = Mat4::one();
-    //translate(&mat, vec3(rect.pos.x as f32, rect.pos.y as f32, 0.0));
-    //rotate(&mat, rotation, vec3(0.0, 0.0, 1.0));
-    //scale(
-    //    &mat,
-    //    vec3(rect.size.width as f32, rect.size.height as f32, 0.0),
-    //);
-    //mat
-
-    let mut mat = Mat4::one();
-    mat = translate(&mat, vec3(rect.pos.x as f32, rect.pos.y as f32, 0.0));
-    mat = rotate(&mat, rotation, vec3(0.0, 0.0, 1.0));
-    mat = scale(
-        &mat,
-        vec3(rect.size.width as f32, rect.size.height as f32, 0.0),
-    );
-    mat
-
-    // translate(
-    //     &Mat4::one(),
-    //     vec3(rect.pos.x as f32, rect.pos.y as f32, 0.0),
-    // ) * rotate(&Mat4::one(), rotation, vec3(0.0, 0.0, 1.0))
-    //     * scale(
-    //         &Mat4::one(),
-    //         vec3(rect.size.width as f32, rect.size.height as f32, 0.0),
-    //     )
-}
-
 impl Rectangle {
     pub fn new(rect: Rect, color: Vec4) -> Self {
         let device = get_device();
 
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some("Rectangle Uniform Buffer"),
-            size: size_of::<RectangleUniform>() as u64,
-            usage: BufferUsages::UNIFORM,
-            mapped_at_creation: true,
-        });
-
-        let buffer_slice = buffer.slice(..);
-        let data = RectangleUniform {
+        let buffer = UniformBuffer::new_initialized(RectangleUniform {
             transform: model_projection(rect, 0.0),
-            color: color,
-        };
-
-        buffer_slice
-            .get_mapped_range_mut()
-            .copy_from_slice(unsafe { any_as_u8_slice(&data) });
-
-        buffer.unmap();
+            color,
+        });
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Rectangle Uniform Bind Group"),
             layout: get_uniform_binding_layout(),
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: BindingResource::Buffer(buffer.as_entire_buffer_binding()),
+                resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
             }],
         });
 
