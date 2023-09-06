@@ -199,6 +199,9 @@ where
     fn resized(&mut self, size: Size) {
         self.controller.on_resize(size);
         self.surface_dirty = true;
+
+        #[cfg(target_os = "macos")]
+        self.window.as_ref().unwrap().request_redraw();
     }
 
     fn moved(&mut self, pos: Point) {
