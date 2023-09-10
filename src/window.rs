@@ -1,6 +1,9 @@
 use crate::drawing::*;
 use crate::gfx::*;
+use crate::scene::*;
 use crate::*;
+use std::cell::{Ref, RefCell};
+use std::ops::Deref;
 
 use glm::ext::*;
 use glm::*;
@@ -12,32 +15,33 @@ use winit::window::*;
 
 use wgpu::*;
 
-pub(crate) trait WindowInterface {
+#[allow(unused_imports)]
+use winit::platform::windows::WindowBuilderExtWindows;
+
+pub trait Window {
     fn id(&self) -> WindowId;
     fn resized(&mut self, size: Size);
     fn moved(&mut self, pos: Point);
     fn redraw_requested(&mut self);
-    fn close_requested(&self) -> bool;
+    fn close_requested(&mut self) -> bool;
     fn close(&mut self);
-    fn closed(&self);
+    fn closed(&mut self);
 }
 
 pub trait WindowController: Sized + 'static {
-    fn new() -> Self;
+    fn on_create(&mut self, _window: &UiWindow<Self>) {}
 
-    fn on_create(&mut self, _window: &mut Window) {}
+    fn on_resize(&mut self, _window: &UiWindow<Self>, _size: Size) {}
 
-    fn on_resize(&mut self, _size: Size) {}
+    fn on_moved(&mut self, _window: &UiWindow<Self>, _pos: Point) {}
 
-    fn on_moved(&mut self, _pos: Point) {}
-
-    fn on_close(&self) -> bool {
+    fn on_close(&mut self, _window: &UiWindow<Self>) -> bool {
         true
     }
 
-    fn on_closed(&self) {}
+    fn on_closed(&mut self, _window: &UiWindow<Self>) {}
 
-    fn on_poll(&mut self) {}
+    fn on_poll(&mut self, _window: &UiWindow<Self>) {}
 }
 
 pub struct WindowConfig<'a> {
@@ -46,6 +50,7 @@ pub struct WindowConfig<'a> {
     pub pos: Option<Point>,
     pub resizable: bool,
     pub decorations: bool,
+    pub transparent: bool,
 }
 
 impl Default for WindowConfig<'_> {
@@ -56,6 +61,7 @@ impl Default for WindowConfig<'_> {
             pos: None,
             resizable: true,
             decorations: true,
+            transparent: false,
         }
     }
 }
@@ -64,6 +70,7 @@ impl WindowConfig<'_> {
     fn to_builder(&self) -> WindowBuilder {
         let mut builder = WindowBuilder::new()
             .with_visible(false)
+            .with_transparent(self.transparent)
             .with_resizable(self.resizable)
             .with_decorations(self.decorations);
 
@@ -91,50 +98,72 @@ impl WindowConfig<'_> {
     }
 }
 
-pub struct Window<'a> {
-    window: &'a winit::window::Window,
-}
+// pub struct Window<'a> {
+//     window: &'a winit::window::Window,
+//     scene: Option<Box<dyn SceneInterface>>,
+// }
+//
+// impl<'a> Window<'a> {
+//     fn new(window: &'a winit::window::Window) -> Self {
+//         Self {
+//             window,
+//             scene: None,
+//         }
+//     }
+//
+//     pub fn show(&self) {
+//         self.window.set_visible(true);
+//     }
+//
+//     pub fn hide(&self) {
+//         self.window.set_visible(false);
+//     }
+//
+//     pub fn swap_scene(&mut self, scene: Box<dyn SceneInterface>) -> Option<Box<dyn SceneInterface>> {
+//         self.scene.replace(scene)
+//     }
+// }
 
-impl<'a> Window<'a> {
-    fn new(window: &'a winit::window::Window) -> Self {
-        Self { window }
-    }
-
-    pub fn show(&self) {
-        self.window.set_visible(true);
-    }
-}
-
-pub(crate) struct WindowImpl<C>
+pub struct UiWindow<C>
 where
     C: WindowController,
 {
     window: Option<winit::window::Window>,
     surface: Option<Surface>,
     surface_dirty: bool,
-    controller: C,
+    controller: RefCell<C>,
+    scene: RefCell<Option<Box<dyn SceneInterface>>>,
 }
 
-impl<C> WindowImpl<C>
+impl<C> UiWindow<C>
 where
     C: WindowController,
 {
-    pub(crate) fn new(config: &WindowConfig, event_loop: &EventLoopWindowTarget<()>) -> Box<Self> {
-        let mut controller = C::new();
-
-        let window = config.to_builder().build(event_loop).unwrap();
+    pub fn new(app: &Application, config: &WindowConfig, controller: C) -> Box<Self> {
+        let window = config.to_builder().build(app.event_loop).unwrap();
         let surface = unsafe { get_instance().create_surface(&window).unwrap() };
-
-        let mut s = Self {
+        let mut s = Box::new(Self {
             window: Some(window),
             surface: Some(surface),
             surface_dirty: true,
-            controller,
-        };
+            controller: RefCell::new(controller),
+            scene: RefCell::new(None),
+        });
         s.redraw_requested();
-        s.controller
-            .on_create(&mut Window::new(&s.window.as_ref().unwrap()));
-        Box::new(s)
+        s.controller.borrow_mut().on_create(&s);
+        s
+    }
+
+    pub fn show(&self) {
+        self.window.as_ref().unwrap().set_visible(true);
+    }
+
+    pub fn hide(&self) {
+        self.window.as_ref().unwrap().set_visible(false);
+    }
+
+    pub fn swap_scene(&self, scene: Box<dyn SceneInterface>) -> Option<Box<dyn SceneInterface>> {
+        self.scene.borrow_mut().replace(scene)
     }
 
     fn update_surface(&mut self) {
@@ -188,7 +217,7 @@ fn find_best_alpha_mode(capabilities: &SurfaceCapabilities) -> CompositeAlphaMod
     *capabilities.alpha_modes.first().unwrap()
 }
 
-impl<C> WindowInterface for WindowImpl<C>
+impl<C> Window for UiWindow<C>
 where
     C: WindowController,
 {
@@ -197,7 +226,7 @@ where
     }
 
     fn resized(&mut self, size: Size) {
-        self.controller.on_resize(size);
+        self.controller.borrow_mut().on_resize(self, size);
         self.surface_dirty = true;
 
         #[cfg(target_os = "macos")]
@@ -205,12 +234,17 @@ where
     }
 
     fn moved(&mut self, pos: Point) {
-        self.controller.on_moved(pos);
+        self.controller.borrow_mut().on_moved(self, pos);
     }
 
     fn redraw_requested(&mut self) {
         if self.surface_dirty {
             self.update_surface();
+        }
+
+        let scene = self.scene.borrow_mut();
+        if let Some(scene) = scene.as_ref() {
+            scene.update_layout(self.window.as_ref().unwrap().inner_size().into());
         }
 
         let surface = self.surface.as_ref().unwrap();
@@ -223,23 +257,9 @@ where
         let device = get_device();
         let mut encoder = device.create_command_encoder(&Default::default());
 
-        let rect = Rectangle::new(
-            Rect {
-                pos: Point { x: 0, y: 0 },
-                size: Size {
-                    width: 1200,
-                    height: 700,
-                },
-            },
-            Vec4::new(1.0, 0.0, 1.0, 1.0),
-        );
-
         let size = self.window.as_ref().unwrap().inner_size();
 
-        let buffer = UniformBuffer::new_initialized(UniformRenderInfo::new(Size {
-            width: size.width,
-            height: size.height,
-        }));
+        let buffer = UniformBuffer::new_initialized(UniformRenderInfo::new(size.into()));
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Uxui Render Info Bind Group"),
@@ -251,13 +271,18 @@ where
         });
 
         {
+            let clear_color: wgpu::Color = match scene.as_ref() {
+                Some(scene) => scene.get_background_color().into(),
+                None => wgpu::Color::BLACK,
+            };
+
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("Uxui Render Pass"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     ops: Operations {
-                        load: LoadOp::Clear(Color::BLACK),
+                        load: LoadOp::Clear(clear_color),
                         store: true,
                     },
                 })],
@@ -267,7 +292,10 @@ where
             render_pass.set_bind_group(0, &bind_group, &[]);
 
             let mut drawing_context = DrawingContext::new(render_pass);
-            drawing_context.draw_rectangle(&rect);
+
+            if let Some(scene) = scene.as_ref() {
+                scene.draw(&mut drawing_context);
+            }
         }
 
         let command = encoder.finish();
@@ -276,8 +304,8 @@ where
         texture.present();
     }
 
-    fn close_requested(&self) -> bool {
-        self.controller.on_close()
+    fn close_requested(&mut self) -> bool {
+        self.controller.borrow_mut().on_close(self)
     }
 
     fn close(&mut self) {
@@ -285,8 +313,8 @@ where
         self.window = None;
     }
 
-    fn closed(&self) {
-        self.controller.on_closed();
+    fn closed(&mut self) {
+        self.controller.borrow_mut().on_closed(self);
     }
 }
 
@@ -319,12 +347,7 @@ struct UniformRenderInfo {
 impl UniformRenderInfo {
     fn new(render_area: Size) -> Self {
         Self {
-            projection: orthographic2d(
-                0.0,
-                render_area.width as f32,
-                render_area.height as f32,
-                0.0,
-            ),
+            projection: orthographic2d(0.0, render_area.width, render_area.height, 0.0),
             view: look_at(
                 vec3(0.0, 0.0, 0.0),
                 vec3(0.0, 0.0, -1.0),

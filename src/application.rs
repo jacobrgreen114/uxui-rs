@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use winit::event::*;
 use winit::event_loop::*;
 use winit::platform::run_return::EventLoopExtRunReturn;
-use winit::window::*;
 
 /* Application */
 
@@ -43,7 +42,7 @@ pub trait ApplicationController: Sized + 'static {
 }
 
 struct ApplicationData {
-    windows: HashMap<WindowId, Box<dyn WindowInterface>>,
+    windows: HashMap<winit::window::WindowId, Box<dyn Window>>,
 }
 
 impl ApplicationData {
@@ -56,7 +55,7 @@ impl ApplicationData {
 
 pub struct Application<'a> {
     app_data: &'a mut ApplicationData,
-    event_loop: &'a EventLoopWindowTarget<()>,
+    pub(crate) event_loop: &'a EventLoopWindowTarget<()>,
 }
 
 impl<'a> Application<'a> {
@@ -67,11 +66,7 @@ impl<'a> Application<'a> {
         }
     }
 
-    pub fn create_window<WinC>(&mut self, config: &WindowConfig<'a>)
-    where
-        WinC: WindowController,
-    {
-        let window = WindowImpl::<WinC>::new(config, self.event_loop);
+    pub fn push_window(&mut self, window: Box<dyn Window>) {
         self.app_data.windows.insert(window.id(), window);
     }
 
@@ -99,13 +94,10 @@ impl<'a> Application<'a> {
                     if let Some(window) = app.windows.get_mut(&window_id) {
                         match event {
                             WindowEvent::Resized(size) => {
-                                window.resized(Size {
-                                    width: size.width,
-                                    height: size.height,
-                                });
+                                window.resized(size.into());
                             }
                             WindowEvent::Moved(pos) => {
-                                window.moved(Point { x: pos.x, y: pos.y });
+                                window.moved(pos.into());
                             }
                             WindowEvent::CloseRequested => {
                                 if window.close_requested() {
@@ -113,7 +105,7 @@ impl<'a> Application<'a> {
                                 }
                             }
                             WindowEvent::Destroyed => {
-                                let window = app.windows.remove(&window_id).unwrap();
+                                let mut window = app.windows.remove(&window_id).unwrap();
                                 window.closed();
                             }
                             WindowEvent::DroppedFile(_) => {}
