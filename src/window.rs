@@ -3,6 +3,7 @@ use crate::gfx::*;
 use crate::scene::*;
 use crate::*;
 use std::cell::{Ref, RefCell};
+use std::ffi::c_void;
 use std::ops::Deref;
 
 use glm::ext::*;
@@ -15,9 +16,6 @@ use winit::window::*;
 
 use wgpu::*;
 
-#[allow(unused_imports)]
-use winit::platform::windows::WindowBuilderExtWindows;
-
 pub trait Window {
     fn id(&self) -> WindowId;
     fn resized(&mut self, size: Size);
@@ -26,6 +24,11 @@ pub trait Window {
     fn close_requested(&mut self) -> bool;
     fn close(&mut self);
     fn closed(&mut self);
+    fn poll(&mut self);
+}
+
+pub trait WindowBuilder {
+    fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window>;
 }
 
 pub trait WindowController: Sized + 'static {
@@ -67,8 +70,8 @@ impl Default for WindowConfig<'_> {
 }
 
 impl WindowConfig<'_> {
-    fn to_builder(&self) -> WindowBuilder {
-        let mut builder = WindowBuilder::new()
+    fn to_builder(&self) -> winit::window::WindowBuilder {
+        let mut builder = winit::window::WindowBuilder::new()
             .with_visible(false)
             .with_transparent(self.transparent)
             .with_resizable(self.resizable)
@@ -98,31 +101,80 @@ impl WindowConfig<'_> {
     }
 }
 
-// pub struct Window<'a> {
-//     window: &'a winit::window::Window,
-//     scene: Option<Box<dyn SceneInterface>>,
-// }
-//
-// impl<'a> Window<'a> {
-//     fn new(window: &'a winit::window::Window) -> Self {
-//         Self {
-//             window,
-//             scene: None,
-//         }
-//     }
-//
-//     pub fn show(&self) {
-//         self.window.set_visible(true);
-//     }
-//
-//     pub fn hide(&self) {
-//         self.window.set_visible(false);
-//     }
-//
-//     pub fn swap_scene(&mut self, scene: Box<dyn SceneInterface>) -> Option<Box<dyn SceneInterface>> {
-//         self.scene.replace(scene)
-//     }
-// }
+pub struct UiWindowBuilder<C>
+where
+    C: WindowController,
+{
+    builder: winit::window::WindowBuilder,
+    phantom: std::marker::PhantomData<C>,
+}
+
+impl<C> UiWindowBuilder<C>
+where
+    C: WindowController,
+{
+    pub fn new() -> Self {
+        Self {
+            builder: winit::window::WindowBuilder::default(),
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn with_title(mut self, title: &str) -> Self {
+        self.builder = self.builder.with_title(title);
+        self
+    }
+
+    pub fn with_size(mut self, size: Size) -> Self {
+        self.builder = self
+            .builder
+            .with_inner_size(LogicalSize::new(size.width, size.height));
+        self
+    }
+
+    pub fn with_pos(mut self, pos: Point) -> Self {
+        self.builder = self
+            .builder
+            .with_position(LogicalPosition::new(pos.x, pos.y));
+        self
+    }
+
+    pub fn with_resizable(mut self, resizable: bool) -> Self {
+        self.builder = self.builder.with_resizable(resizable);
+        self
+    }
+
+    pub fn with_decorations(mut self, decorations: bool) -> Self {
+        self.builder = self.builder.with_decorations(decorations);
+        self
+    }
+
+    pub fn with_transparent(mut self, transparent: bool) -> Self {
+        self.builder = self.builder.with_transparent(transparent);
+        self
+    }
+}
+
+impl<C> WindowBuilder for UiWindowBuilder<C>
+where
+    C: WindowController,
+{
+    fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window> {
+        todo!();
+        // let window = self.builder.build(app.event_loop).unwrap();
+        // let surface = unsafe { get_instance().create_surface(&window).unwrap() };
+        // let mut s = Box::new(UiWindow {
+        //     window: Some(window),
+        //     surface: Some(surface),
+        //     surface_dirty: true,
+        //     controller: RefCell::new(()),
+        //     scene: RefCell::new(None),
+        // });
+        // s.redraw_requested();
+        // s.controller.borrow_mut().on_create(&s);
+        // s
+    }
+}
 
 pub struct UiWindow<C>
 where
@@ -142,16 +194,17 @@ where
     pub fn new(app: &Application, config: &WindowConfig, controller: C) -> Box<Self> {
         let window = config.to_builder().build(app.event_loop).unwrap();
         let surface = unsafe { get_instance().create_surface(&window).unwrap() };
-        let mut s = Box::new(Self {
+
+        let mut this = Box::new(Self {
             window: Some(window),
             surface: Some(surface),
             surface_dirty: true,
             controller: RefCell::new(controller),
             scene: RefCell::new(None),
         });
-        s.redraw_requested();
-        s.controller.borrow_mut().on_create(&s);
-        s
+        this.redraw_requested();
+        this.controller.borrow_mut().on_create(&this);
+        this
     }
 
     pub fn show(&self) {
@@ -171,22 +224,25 @@ where
 
         let surface = self.surface.as_ref().unwrap();
 
-        let capabilities = surface.get_capabilities(get_adapter());
-
-        let format = find_best_format(&capabilities);
-        let present_mode = find_best_present_mode(&capabilities);
-        let alpha_mode = find_best_alpha_mode(&capabilities);
+        // let capabilities = surface.get_capabilities(get_adapter());
+        //
+        // let format = find_best_format(&capabilities);
+        // let present_mode = find_best_present_mode(&capabilities);
+        // let alpha_mode = find_best_alpha_mode(&capabilities);
         let size = self.window.as_ref().unwrap().inner_size();
 
-        let config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width: size.width,
-            height: size.height,
-            present_mode,
-            alpha_mode,
-            view_formats: vec![format],
-        };
+        let config = surface
+            .get_default_config(get_adapter(), size.width, size.height)
+            .unwrap();
+        // let config = SurfaceConfiguration {
+        //     usage: TextureUsages::RENDER_ATTACHMENT,
+        //     format,
+        //     width: size.width,
+        //     height: size.height,
+        //     present_mode,
+        //     alpha_mode,
+        //     view_formats: vec![],
+        // };
 
         surface.configure(get_device(), &config);
 
@@ -195,6 +251,11 @@ where
 }
 
 fn find_best_format(capabilities: &SurfaceCapabilities) -> TextureFormat {
+    // todo : implement hdr compatibility
+    // if capabilities.formats.contains(&TextureFormat::Rgba16Float) {
+    //     return TextureFormat::Rgba16Float;
+    // }
+
     if capabilities
         .formats
         .contains(&TextureFormat::Bgra8UnormSrgb)
@@ -229,6 +290,10 @@ where
         self.controller.borrow_mut().on_resize(self, size);
         self.surface_dirty = true;
 
+        if let Some(scene) = self.scene.borrow_mut().as_mut() {
+            scene.on_canvas_size_changed(size);
+        }
+
         #[cfg(target_os = "macos")]
         self.window.as_ref().unwrap().request_redraw();
     }
@@ -242,8 +307,8 @@ where
             self.update_surface();
         }
 
-        let scene = self.scene.borrow_mut();
-        if let Some(scene) = scene.as_ref() {
+        let mut scene = self.scene.borrow_mut();
+        if let Some(scene) = scene.as_mut() {
             scene.update_layout(self.window.as_ref().unwrap().inner_size().into());
         }
 
@@ -315,6 +380,10 @@ where
 
     fn closed(&mut self) {
         self.controller.borrow_mut().on_closed(self);
+    }
+
+    fn poll(&mut self) {
+        self.window.as_ref().unwrap().request_redraw();
     }
 }
 

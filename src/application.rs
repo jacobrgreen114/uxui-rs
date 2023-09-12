@@ -86,6 +86,10 @@ impl<'a> Application<'a> {
                     }
                     StartCause::Poll => {
                         controller.on_poll();
+
+                        for window in app.windows.values_mut() {
+                            window.poll();
+                        }
                     }
                     StartCause::ResumeTimeReached { .. } => {}
                     StartCause::WaitCancelled { .. } => {}

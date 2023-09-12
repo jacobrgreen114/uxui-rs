@@ -74,50 +74,96 @@ where
     }
 }
 
-#[inline]
-pub fn calculate_available_size(sizing: &Sizing, available_size: Size) -> Size {
-    Size {
-        width: match sizing.width.desired {
-            Length::Fit | Length::Fill => available_size
-                .width
-                .max(sizing.width.min)
-                .min(sizing.width.max),
-            Length::Fixed(pixels) => pixels,
-        },
-        height: match sizing.height.desired {
-            Length::Fit | Length::Fill => available_size
-                .width
-                .max(sizing.height.min)
-                .min(sizing.height.max),
-            Length::Fixed(pixels) => pixels,
-        },
+pub trait ComponentSizingExt {
+    fn calc_available_size(&self, available_size: Size) -> Size;
+    fn calc_final_size(&self, available_size: Size, required_size: Size) -> Size;
+}
+
+impl ComponentSizingExt for Sizing {
+    fn calc_available_size(&self, available_size: Size) -> Size {
+        Size {
+            width: match self.width.desired {
+                Length::Fit | Length::Fill => {
+                    available_size.width.max(self.width.min).min(self.width.max)
+                }
+                Length::Fixed(pixels) => pixels,
+            },
+            height: match self.height.desired {
+                Length::Fit | Length::Fill => available_size
+                    .height
+                    .max(self.height.min)
+                    .min(self.height.max),
+                Length::Fixed(pixels) => pixels,
+            },
+        }
+    }
+
+    fn calc_final_size(&self, available_size: Size, required_size: Size) -> Size {
+        Size {
+            width: match self.width.desired {
+                Length::Fit => required_size.width.max(self.width.min).min(self.width.max),
+                Length::Fill => available_size.width.max(self.width.min).min(self.width.max),
+                Length::Fixed(pixels) => pixels,
+            },
+            height: match self.height.desired {
+                Length::Fit => required_size
+                    .height
+                    .max(self.height.min)
+                    .min(self.height.max),
+                Length::Fill => available_size
+                    .height
+                    .max(self.height.min)
+                    .min(self.height.max),
+                Length::Fixed(pixels) => pixels,
+            },
+        }
     }
 }
 
-#[inline]
-pub fn calculate_final_size(sizing: &Sizing, available_size: Size, required_size: Size) -> Size {
-    Size {
-        width: match sizing.width.desired {
-            Length::Fit => required_size
-                .width
-                .max(sizing.width.min)
-                .min(sizing.width.max),
-            Length::Fill => available_size
-                .width
-                .max(sizing.width.min)
-                .min(sizing.width.max),
-            Length::Fixed(pixels) => pixels,
-        },
-        height: match sizing.height.desired {
-            Length::Fit => required_size
-                .height
-                .max(sizing.height.min)
-                .min(sizing.height.max),
-            Length::Fill => available_size
-                .height
-                .max(sizing.height.min)
-                .min(sizing.height.max),
-            Length::Fixed(pixels) => pixels,
-        },
-    }
-}
+//#[inline]
+//pub fn calculate_available_size(sizing: &Sizing, available_size: Size) -> Size {
+//    Size {
+//        width: match sizing.width.desired {
+//            Length::Fit | Length::Fill => available_size
+//                .width
+//                .max(sizing.width.min)
+//                .min(sizing.width.max),
+//            Length::Fixed(pixels) => pixels,
+//        },
+//        height: match sizing.height.desired {
+//            Length::Fit | Length::Fill => available_size
+//                .height
+//                .max(sizing.height.min)
+//                .min(sizing.height.max),
+//            Length::Fixed(pixels) => pixels,
+//        },
+//    }
+//}
+//
+//#[inline]
+//pub fn calculate_final_size(sizing: &Sizing, available_size: Size, required_size: Size) -> Size {
+//    Size {
+//        width: match sizing.width.desired {
+//            Length::Fit => required_size
+//                .width
+//                .max(sizing.width.min)
+//                .min(sizing.width.max),
+//            Length::Fill => available_size
+//                .width
+//                .max(sizing.width.min)
+//                .min(sizing.width.max),
+//            Length::Fixed(pixels) => pixels,
+//        },
+//        height: match sizing.height.desired {
+//            Length::Fit => required_size
+//                .height
+//                .max(sizing.height.min)
+//                .min(sizing.height.max),
+//            Length::Fill => available_size
+//                .height
+//                .max(sizing.height.min)
+//                .min(sizing.height.max),
+//            Length::Fixed(pixels) => pixels,
+//        },
+//    }
+//}

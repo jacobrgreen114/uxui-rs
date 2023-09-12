@@ -1,6 +1,8 @@
 use crate::drawing::*;
 use crate::*;
 
+use crate::component::*;
+
 #[derive(Debug, Default)]
 pub struct ButtonBuilder {
     sizing: Sizing,
@@ -37,6 +39,7 @@ impl ButtonBuilder {
             sizing: self.sizing,
             background_color: self.background,
             background: Rectangle::new(Rect::default(), self.background),
+            layout_dirty: true,
         })
     }
 }
@@ -45,6 +48,7 @@ pub struct Button {
     sizing: Sizing,
     background_color: Color,
     background: Rectangle,
+    layout_dirty: bool,
 }
 
 impl Button {
@@ -65,7 +69,7 @@ impl Button {
 
 impl Component for Button {
     fn is_layout_dirty(&self) -> bool {
-        todo!()
+        self.layout_dirty
     }
 
     fn is_visually_dirty(&self) -> bool {
@@ -73,11 +77,13 @@ impl Component for Button {
     }
 
     fn measure(&mut self, available_size: Size) -> Size {
-        calculate_available_size(&self.sizing, available_size)
+        let available = self.sizing.calc_available_size(available_size);
+        self.sizing.calc_final_size(available, Size::default())
     }
 
     fn arrange(&mut self, final_rect: Rect) -> Rect {
         self.background.update(final_rect, self.background_color);
+        self.layout_dirty = false;
         final_rect
     }
 

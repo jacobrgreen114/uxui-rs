@@ -2,21 +2,9 @@ use crate::component::*;
 use crate::drawing::*;
 use crate::*;
 
-use freetype as ft;
+pub struct Row {}
 
-pub struct Text {
-    text: BindableString,
-}
-
-impl Text {
-    pub fn new(text: &str) -> Box<Self> {
-        Box::new(Self {
-            text: BindableString::Static(text.into()),
-        })
-    }
-}
-
-impl Component for Text {
+impl Component for Row {
     fn is_layout_dirty(&self) -> bool {
         todo!()
     }
@@ -37,5 +25,3 @@ impl Component for Text {
         todo!()
     }
 }
-
-

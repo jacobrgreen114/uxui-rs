@@ -21,30 +21,26 @@ pub(crate) fn get_queue() -> &'static Queue {
 }
 
 fn create_instance() -> Instance {
-    Instance::new(InstanceDescriptor {
-        backends: Backends::PRIMARY,
-        ..Default::default()
-    })
+    Instance::new(InstanceDescriptor::default())
 }
 
 fn create_adapter() -> Adapter {
-    let options = RequestAdapterOptions {
+    futures::executor::block_on(get_instance().request_adapter(&RequestAdapterOptions {
         power_preference: PowerPreference::None,
         force_fallback_adapter: false,
         compatible_surface: None,
-    };
-
-    futures::executor::block_on(get_instance().request_adapter(&options)).unwrap()
+    }))
+    .unwrap()
 }
 
 fn create_device_queue() -> (Device, Queue) {
-    let descriptor = DeviceDescriptor {
-        label: Some("uxui device"),
-        features: Features::default(),
-        limits: Limits {
-            ..Default::default()
+    futures::executor::block_on(get_adapter().request_device(
+        &DeviceDescriptor {
+            label: Some("Uxui device"),
+            features: Features::default(),
+            limits: Limits::default(),
         },
-    };
-
-    futures::executor::block_on(get_adapter().request_device(&descriptor, None)).unwrap()
+        None,
+    ))
+    .unwrap()
 }

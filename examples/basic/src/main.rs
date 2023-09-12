@@ -47,35 +47,38 @@ impl SceneController for LoginSceneController {
     fn on_init(&mut self, scene: &Scene<Self>) {
         let model = self.model.clone();
 
-        // let root = Column::build()
-        //     .with_width(Length::Fit)
-        //     .with_height(Length::Fit)
-        //     .with_children(vec![
-        //         // Input::builder()
-        //         //     .with_hint("Username")
-        //         //     .with_binding(self.model.username.create_binding())
-        //         //     .build(),
-        //         // Input::builder()
-        //         //     .with_hint("Password")
-        //         //     .with_binding(self.model.password.create_binding())
-        //         //     .build(),
-        //         Button::builder()
-        //             .with_label("Login")
-        //             .with_background(Color::new_rgb(0.0, 1.0, 0.0))
-        //             .with_action(Box::new(move || {
-        //                 model.on_login();
-        //             }))
-        //             .build(),
-        //     ])
-        //     .build();
+        let root = Column::build()
+            .with_width(Length::Fill)
+            .with_height(Length::Fill)
+            .with_horizontal_alignment(HorizontalAlignment::Center)
+            .with_children(vec![
+                // Input::builder()
+                //     .with_hint("Username")
+                //     .with_binding(self.model.username.create_binding())
+                //     .build(),
+                // Input::builder()
+                //     .with_hint("Password")
+                //     .with_binding(self.model.password.create_binding())
+                //     .build(),
+                Button::builder()
+                    .with_label("Login")
+                    .with_width(Length::Fixed(100.0))
+                    .with_height(Length::Fixed(50.0))
+                    .with_background(Color::new_rgb(0.0, 1.0, 0.0))
+                    .with_action(Box::new(move || {
+                        model.on_login();
+                    }))
+                    .build(),
+                Button::builder()
+                    .with_label("Login")
+                    .with_width(Length::Fixed(500.0))
+                    .with_height(Length::Fixed(50.0))
+                    .with_background(Color::new_rgb(0.0, 1.0, 1.0))
+                    .build(),
+            ])
+            .build();
 
-        // let root = Button::builder()
-        //     .with_background(Color::new_rgb(0.0, 1.0, 0.0))
-        //     .with_width(Length::Fixed(100.0))
-        //     .with_height(Length::Fixed(100.0))
-        //     .build();
-        //
-        // scene.swap_root(Some(root));
+        scene.swap_root(Some(root));
     }
 }
 
@@ -115,25 +118,37 @@ impl ApplicationController for ExampleAppController {
     }
 
     fn on_start(&mut self, app: &mut Application) {
-        println!("Application started");
         app.push_window(UiWindow::new(
             app,
             &WindowConfig {
                 title: Some("Example Window"),
                 size: Some(Size {
-                    width: 1280.0,
-                    height: 720.0,
+                    width: 640.0,
+                    height: 480.0,
                 }),
+                resizable: false,
                 ..Default::default()
             },
             ExampleWindowController::new(),
         ));
     }
+
+    // fn run_mode(&self) -> RunMode {
+    //     RunMode::Poll
+    // }
 }
 
 fn main() {
     unsafe {
         TIMER = Some(Instant::now());
     }
+
+    let best_font = uxui::font::find_best_font(&uxui::font::BestFontQuery {
+        query: uxui::font::FontQuery::FamilyName("Segoe UI"),
+        style: Default::default(),
+    })
+    .unwrap();
+
+    println!("Best font: {:#?}", best_font);
     Application::run::<ExampleAppController>()
 }
