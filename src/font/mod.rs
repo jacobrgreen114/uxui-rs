@@ -44,6 +44,7 @@ fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<String, FontFamily>, path: P)
                 match library.new_face(path, 0) {
                     Ok(face) => face,
                     Err(err) => {
+                        #[cfg(debug_assertions)]
                         eprintln!("Error loading font {}: {}", entry.path().display(), err);
                         continue;
                     }
@@ -202,36 +203,6 @@ impl Font {
         }
     }
 }
-
-// pub trait Distance {
-//     type Output;
-//     fn distance(&self, other: &Self) -> Output;
-// }
-//
-// fn find_closest<It>(iter: It, value: &It::Item) -> Option<It::Item>
-// where
-//     It: Iterator<Item: impl Distance<Output: impl PartialOrd>>,
-// {
-//     let mut best_match: Option<It::Item> = None;
-//     let mut best_distance: Option<Output> = None;
-//
-//     for item in iter {
-//         let distance = value.distance(&item);
-//         if let Some(_) = best_match {
-//             unsafe {
-//                 if distance < best_distance.unwrap() {
-//                     best_match = Some(item);
-//                     best_distance = Some(distance);
-//                 }
-//             }
-//         } else {
-//             best_match = Some(item);
-//             best_distance = Some(distance);
-//         }
-//     }
-//
-//     best_match
-// }
 
 #[derive(Debug)]
 pub struct FontFamily {

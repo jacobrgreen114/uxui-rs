@@ -11,6 +11,8 @@ use winit::platform::run_return::EventLoopExtRunReturn;
 
 pub enum RunMode {
     Wait,
+    WaitTimeout(std::time::Duration),
+    WaitTill(std::time::Instant),
     Poll,
 }
 
@@ -58,6 +60,10 @@ pub struct Application<'a> {
     pub(crate) event_loop: &'a EventLoopWindowTarget<()>,
 }
 
+fn line_to_pixels(lines: Delta) -> Delta {
+    Delta::new(lines.x * 120.0, lines.y * 120.0)
+}
+
 impl<'a> Application<'a> {
     fn new(app_data: &'a mut ApplicationData, event_loop: &'a EventLoopWindowTarget<()>) -> Self {
         Self {
@@ -91,8 +97,20 @@ impl<'a> Application<'a> {
                             window.poll();
                         }
                     }
-                    StartCause::ResumeTimeReached { .. } => {}
-                    StartCause::WaitCancelled { .. } => {}
+                    StartCause::ResumeTimeReached { .. } => {
+                        controller.on_poll();
+
+                        for window in app.windows.values_mut() {
+                            window.poll();
+                        }
+                    }
+                    StartCause::WaitCancelled { .. } => {
+                        controller.on_poll();
+
+                        for window in app.windows.values_mut() {
+                            window.poll();
+                        }
+                    }
                 },
                 Event::WindowEvent { event, window_id } => {
                     if let Some(window) = app.windows.get_mut(&window_id) {
@@ -117,20 +135,35 @@ impl<'a> Application<'a> {
                             WindowEvent::HoveredFileCancelled => {}
                             WindowEvent::ReceivedCharacter(_) => {}
                             WindowEvent::Focused(_) => {}
-                            WindowEvent::KeyboardInput { .. } => {}
+                            WindowEvent::KeyboardInput { input, .. } => {
+                                window.key_event(input);
+                            }
                             WindowEvent::ModifiersChanged(_) => {}
                             WindowEvent::Ime(_) => {}
-                            WindowEvent::CursorMoved { .. } => {}
+                            WindowEvent::CursorMoved { position, .. } => {
+                                window.cursor_moved(position.into());
+                            }
                             WindowEvent::CursorEntered { .. } => {}
                             WindowEvent::CursorLeft { .. } => {}
-                            WindowEvent::MouseWheel { .. } => {}
-                            WindowEvent::MouseInput { .. } => {}
+                            WindowEvent::MouseWheel { delta, .. } => match delta {
+                                MouseScrollDelta::LineDelta(x, y) => {
+                                    window.scroll(line_to_pixels(Delta::new(x, y)));
+                                }
+                                MouseScrollDelta::PixelDelta(pos) => {
+                                    window.scroll(Delta::new(pos.x as f32, pos.y as f32));
+                                }
+                            },
+                            WindowEvent::MouseInput { button, state, .. } => {
+                                window.mouse_button(MouseButtonEvent { button, state });
+                            }
                             WindowEvent::TouchpadMagnify { .. } => {}
                             WindowEvent::SmartMagnify { .. } => {}
                             WindowEvent::TouchpadRotate { .. } => {}
                             WindowEvent::TouchpadPressure { .. } => {}
                             WindowEvent::AxisMotion { .. } => {}
-                            WindowEvent::Touch(_) => {}
+                            WindowEvent::Touch(touch) => {
+                                eprintln!("Touch currently unsupported!");
+                            }
                             WindowEvent::ScaleFactorChanged { .. } => {}
                             WindowEvent::ThemeChanged(_) => {}
                             WindowEvent::Occluded(_) => {}
@@ -145,6 +178,7 @@ impl<'a> Application<'a> {
                 Event::Resumed => {}
                 Event::MainEventsCleared => {}
                 Event::RedrawRequested(window_id) => {
+                    // println!("Redraw");
                     if let Some(window) = app.windows.get_mut(&window_id) {
                         window.redraw_requested();
                     } else {
@@ -157,6 +191,8 @@ impl<'a> Application<'a> {
 
             match controller.run_mode() {
                 RunMode::Wait => flow.set_wait(),
+                RunMode::WaitTimeout(duration) => flow.set_wait_timeout(duration),
+                RunMode::WaitTill(instant) => flow.set_wait_until(instant),
                 RunMode::Poll => flow.set_poll(),
             }
 

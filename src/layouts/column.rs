@@ -38,7 +38,8 @@ impl ColumnBuilder {
                 .into_iter()
                 .map(|c| ColumnChild {
                     component: c,
-                    size: Size::default(),
+                    final_size: Size::default(),
+                    final_rect: Rect::default(),
                 })
                 .collect(),
             sizing: self.sizing,
@@ -49,7 +50,8 @@ impl ColumnBuilder {
 
 struct ColumnChild {
     component: Box<dyn Component>,
-    size: Size,
+    final_size: Size,
+    final_rect: Rect,
 }
 
 pub struct Column {
@@ -66,10 +68,10 @@ impl Column {
     fn arrange_left(&mut self, final_rect: Rect) -> Rect {
         let mut y = final_rect.pos.y;
         for child in self.children.iter_mut() {
-            child
+            child.final_rect = child
                 .component
-                .arrange(Rect::new(Point::new(final_rect.pos.x, y), child.size));
-            y += child.size.height;
+                .arrange(Rect::new(Point::new(final_rect.pos.x, y), child.final_size));
+            y += child.final_size.height;
         }
         final_rect
     }
@@ -77,14 +79,14 @@ impl Column {
     fn arrange_center(&mut self, final_rect: Rect) -> Rect {
         let mut y = final_rect.pos.y;
         for child in self.children.iter_mut() {
-            child.component.arrange(Rect::new(
+            child.final_rect = child.component.arrange(Rect::new(
                 Point::new(
-                    final_rect.pos.x + (final_rect.size.width - child.size.width) / 2.0,
+                    final_rect.pos.x + (final_rect.size.width - child.final_size.width) / 2.0,
                     y,
                 ),
-                child.size,
+                child.final_size,
             ));
-            y += child.size.height;
+            y += child.final_size.height;
         }
         final_rect
     }
@@ -92,14 +94,14 @@ impl Column {
     fn arrange_right(&mut self, final_rect: Rect) -> Rect {
         let mut y = final_rect.pos.y;
         for child in self.children.iter_mut() {
-            child.component.arrange(Rect::new(
+            child.final_rect = child.component.arrange(Rect::new(
                 Point::new(
-                    final_rect.pos.x + final_rect.size.width - child.size.width,
+                    final_rect.pos.x + final_rect.size.width - child.final_size.width,
                     y,
                 ),
-                child.size,
+                child.final_size,
             ));
-            y += child.size.height;
+            y += child.final_size.height;
         }
         final_rect
     }
@@ -121,9 +123,9 @@ impl Component for Column {
         let mut max_width = 0.0f32;
 
         for child in self.children.iter_mut() {
-            child.size = child.component.measure(remaining_size);
-            remaining_size.height -= child.size.height;
-            max_width = max_width.max(child.size.width);
+            child.final_size = child.component.measure(remaining_size);
+            remaining_size.height -= child.final_size.height;
+            max_width = max_width.max(child.final_size.width);
         }
 
         let required_size = Size::new(max_width, available_size.height - remaining_size.height);

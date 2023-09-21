@@ -8,19 +8,29 @@ use std::ops::{Deref, DerefMut};
 
 pub trait SceneInterface {
     fn update_layout(&mut self, canvas_size: Size);
-
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>);
-
     fn get_background_color(&self) -> Color;
-
     fn on_canvas_size_changed(&mut self, canvas_size: Size);
+
+    //fn on_active_preview(&mut self);
+    fn on_active(&mut self);
+    //fn on_inactive_preview(&mut self);
+    fn on_inactive(&mut self);
+
+    fn key_event(&mut self, event: KeyEvent);
+
+    fn cursor_moved(&mut self, position: Point);
+
+    fn mouse_button_event(&mut self, event: MouseButtonEvent);
+
+    fn mouse_wheel_event(&mut self, delta: Delta);
 }
 
 pub trait SceneController: Sized + 'static {
     fn on_init(&mut self, _scene: &Scene<Self>) {}
-    fn on_active_preview(&mut self, _scene: &Scene<Self>) {}
+    //fn on_active_preview(&mut self, _scene: &Scene<Self>) {}
     fn on_active(&mut self, _scene: &Scene<Self>) {}
-    fn on_inactive_preview(&mut self, _scene: &Scene<Self>) {}
+    //fn on_inactive_preview(&mut self, _scene: &Scene<Self>) {}
     fn on_inactive(&mut self, _scene: &Scene<Self>) {}
 }
 
@@ -76,7 +86,7 @@ where
     }
 
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
-        // todo : figure out a fix for the UnsafeCell
+        // todo : figure out a lifetime fix for the UnsafeCell
         if let Some(root) = unsafe { &*self.root.get() } {
             root.draw(context);
         }
@@ -89,4 +99,20 @@ where
     fn on_canvas_size_changed(&mut self, canvas_size: Size) {
         self.layout_dirty = true;
     }
+
+    fn on_active(&mut self) {
+        self.controller.borrow_mut().on_active(self);
+    }
+
+    fn on_inactive(&mut self) {
+        self.controller.borrow_mut().on_inactive(self);
+    }
+
+    fn key_event(&mut self, event: KeyEvent) {}
+
+    fn cursor_moved(&mut self, position: Point) {}
+
+    fn mouse_button_event(&mut self, event: MouseButtonEvent) {}
+
+    fn mouse_wheel_event(&mut self, delta: Delta) {}
 }

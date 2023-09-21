@@ -70,7 +70,7 @@ impl SceneController for LoginSceneController {
                     }))
                     .build(),
                 Button::builder()
-                    .with_label("Login")
+                    .with_label("Login2")
                     .with_width(Length::Fixed(500.0))
                     .with_height(Length::Fixed(50.0))
                     .with_background(Color::new_rgb(0.0, 1.0, 1.0))
@@ -93,20 +93,12 @@ impl ExampleWindowController {
 impl WindowController for ExampleWindowController {
     fn on_create(&mut self, window: &UiWindow<Self>) {
         let login_scene = Scene::new(LoginSceneController::new());
-        window.swap_scene(login_scene);
+        window.swap_scene(Some(login_scene));
         window.show();
         println!(
             "Window time to show: {:?}",
             unsafe { TIMER }.unwrap().elapsed()
         );
-    }
-
-    fn on_resize(&mut self, window: &UiWindow<Self>, _size: Size) {
-        // println!("Window resized to {:?}", size);
-    }
-
-    fn on_moved(&mut self, window: &UiWindow<Self>, _pos: Point) {
-        // println!("Window moved to {:?}", pos);
     }
 }
 
@@ -126,7 +118,6 @@ impl ApplicationController for ExampleAppController {
                     width: 640.0,
                     height: 480.0,
                 }),
-                resizable: false,
                 ..Default::default()
             },
             ExampleWindowController::new(),
@@ -143,12 +134,5 @@ fn main() {
         TIMER = Some(Instant::now());
     }
 
-    let best_font = uxui::font::find_best_font(&uxui::font::BestFontQuery {
-        query: uxui::font::FontQuery::FamilyName("Segoe UI"),
-        style: Default::default(),
-    })
-    .unwrap();
-
-    println!("Best font: {:#?}", best_font);
     Application::run::<ExampleAppController>()
 }

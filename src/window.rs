@@ -15,6 +15,7 @@ use winit::event_loop::EventLoopWindowTarget;
 use winit::window::*;
 
 use wgpu::*;
+use winit::event::*;
 
 pub trait Window {
     fn id(&self) -> WindowId;
@@ -25,6 +26,11 @@ pub trait Window {
     fn close(&mut self);
     fn closed(&mut self);
     fn poll(&mut self);
+
+    fn key_event(&mut self, event: KeyEvent);
+    fn cursor_moved(&mut self, pos: Point);
+    fn scroll(&mut self, delta: Delta);
+    fn mouse_button(&mut self, event: MouseButtonEvent);
 }
 
 pub trait WindowBuilder {
@@ -215,8 +221,27 @@ where
         self.window.as_ref().unwrap().set_visible(false);
     }
 
-    pub fn swap_scene(&self, scene: Box<dyn SceneInterface>) -> Option<Box<dyn SceneInterface>> {
-        self.scene.borrow_mut().replace(scene)
+    pub fn swap_scene(
+        &self,
+        mut scene: Option<Box<dyn SceneInterface>>,
+    ) -> Option<Box<dyn SceneInterface>> {
+        match scene.as_mut() {
+            Some(scene) => {
+                scene.on_active();
+            }
+            None => {}
+        }
+
+        let mut old_scene = self.scene.replace(scene);
+
+        match old_scene.as_mut() {
+            Some(old_scene) => {
+                old_scene.on_inactive();
+            }
+            None => {}
+        }
+
+        old_scene
     }
 
     fn update_surface(&mut self) {
@@ -384,6 +409,34 @@ where
 
     fn poll(&mut self) {
         self.window.as_ref().unwrap().request_redraw();
+    }
+
+    fn key_event(&mut self, event: KeyEvent) {
+        match self.scene.borrow_mut().as_mut() {
+            Some(scene) => scene.key_event(event),
+            None => {}
+        }
+    }
+
+    fn cursor_moved(&mut self, pos: Point) {
+        match self.scene.borrow_mut().as_mut() {
+            Some(scene) => scene.cursor_moved(pos),
+            None => {}
+        }
+    }
+
+    fn scroll(&mut self, delta: Delta) {
+        match self.scene.borrow_mut().as_mut() {
+            Some(scene) => scene.mouse_wheel_event(delta),
+            None => {}
+        }
+    }
+
+    fn mouse_button(&mut self, event: MouseButtonEvent) {
+        match self.scene.borrow_mut().as_mut() {
+            Some(scene) => scene.mouse_button_event(event),
+            None => {}
+        }
     }
 }
 

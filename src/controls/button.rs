@@ -52,16 +52,6 @@ pub struct Button {
 }
 
 impl Button {
-    // pub fn new() -> Box<Self> {
-    //     // todo!();
-    //     Box::new(Self {})
-    // }
-    //
-    // pub fn labeled(text: &str) -> Box<Self> {
-    //     // todo!();
-    //     Box::new(Self {})
-    // }
-
     pub fn builder() -> ButtonBuilder {
         ButtonBuilder::default()
     }

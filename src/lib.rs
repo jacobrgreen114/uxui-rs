@@ -14,6 +14,7 @@ pub mod font;
 mod gfx;
 pub mod layouts;
 mod scene;
+mod ui;
 mod util;
 mod window;
 
@@ -27,6 +28,8 @@ use glm::Vec4;
 
 use std::ops::*;
 use std::sync::Arc;
+use winit::dpi::PhysicalPosition;
+use winit::event::*;
 
 pub struct StringProperty {
     value: Arc<String>,
@@ -56,6 +59,14 @@ impl From<&str> for StringProperty {
 
 pub struct StringPropertyBinding {
     value: Arc<String>,
+}
+
+type KeyEvent = winit::event::KeyboardInput;
+
+#[derive(Debug, Copy, Clone)]
+pub struct MouseButtonEvent {
+    pub button: MouseButton,
+    pub state: ElementState,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -142,6 +153,15 @@ impl From<winit::dpi::PhysicalPosition<i32>> for Point {
     }
 }
 
+impl From<PhysicalPosition<f64>> for Point {
+    fn from(pos: PhysicalPosition<f64>) -> Self {
+        Self {
+            x: pos.x as f32,
+            y: pos.y as f32,
+        }
+    }
+}
+
 impl Add<Self> for Point {
     type Output = Self;
 
@@ -159,6 +179,8 @@ impl num_traits::Zero for Point {
         self.x == 0.0 && self.y == 0.0
     }
 }
+
+pub type Delta = Point;
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Rect {

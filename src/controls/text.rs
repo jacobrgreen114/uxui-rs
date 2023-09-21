@@ -37,5 +37,3 @@ impl Component for Text {
         todo!()
     }
 }
-
-
