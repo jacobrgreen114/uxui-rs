@@ -1,11 +1,14 @@
 use crate::drawing::*;
 use crate::*;
-use std::cell::RefCell;
+use input_handling::{
+    CursorMovedEvent, InputHandler, KeyEvent, MouseButtonEvent, MouseWheelEvent,
+    PreviewInputHandler,
+};
+use std::cell::{RefCell, UnsafeCell};
 
-pub trait Component {
-    fn is_layout_dirty(&self) -> bool;
-
-    fn is_visually_dirty(&self) -> bool;
+pub trait ComponentController: PreviewInputHandler {
+    // fn is_layout_dirty(&self) -> bool;
+    // fn is_visually_dirty(&self) -> bool;
 
     fn measure(&mut self, available_size: Size) -> Size;
     fn arrange(&mut self, final_rect: Rect) -> Rect;
@@ -13,29 +16,33 @@ pub trait Component {
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>);
 }
 
-pub trait ComponentController: Sized + 'static {
-    fn measure(&mut self, component: &BaseComponent<Self>, available_size: Size) -> Size;
-    fn arrange(&mut self, component: &BaseComponent<Self>, final_rect: Rect) -> Rect;
+#[derive(Default)]
+pub struct ComponentBuilder {
+    sizing: Sizing,
+    // children: Option<Vec<Component>>,
 }
 
-pub struct BaseComponent<C>
-where
-    C: ComponentController,
-{
-    controller: RefCell<C>,
-    visually_dirty: bool,
-    layout_dirty: bool,
-    final_size: Option<Size>,
-    final_rect: Option<Rect>,
-}
+impl ComponentBuilder {
+    pub const fn with_width(mut self, width: Length) -> Self {
+        self.sizing.width.desired = width;
+        self
+    }
 
-impl<C> BaseComponent<C>
-where
-    C: ComponentController,
-{
-    pub fn new(controller: C) -> Self {
-        Self {
-            controller: RefCell::new(controller),
+    pub const fn with_height(mut self, height: Length) -> Self {
+        self.sizing.height.desired = height;
+        self
+    }
+
+    // pub fn with_children(mut self, children: Vec<Component>) -> Self {
+    //     self.children = Some(children);
+    //     self
+    // }
+
+    pub fn build(self, controller: impl ComponentController + 'static) -> Component {
+        Component {
+            sizing: self.sizing,
+            component: Box::new(controller),
+            // children: Vec::new(),
             visually_dirty: true,
             layout_dirty: true,
             final_size: None,
@@ -44,37 +51,79 @@ where
     }
 }
 
-impl<C> Component for BaseComponent<C>
-where
-    C: ComponentController,
-{
-    fn is_layout_dirty(&self) -> bool {
-        todo!()
+pub struct Component {
+    component: Box<dyn ComponentController>,
+    sizing: Sizing,
+    // children: Vec<Component>,
+    final_size: Option<Size>,
+    final_rect: Option<Rect>,
+    visually_dirty: bool,
+    layout_dirty: bool,
+}
+
+impl Component {
+    pub fn is_layout_dirty(&self) -> bool {
+        self.layout_dirty
     }
 
-    fn is_visually_dirty(&self) -> bool {
-        todo!()
+    pub fn is_visually_dirty(&self) -> bool {
+        self.visually_dirty
     }
 
-    fn measure(&mut self, available_size: Size) -> Size {
-        self.final_size
-            .replace(self.controller.borrow_mut().measure(self, available_size));
+    pub fn final_size(&self) -> Size {
         self.final_size.unwrap()
     }
 
-    fn arrange(&mut self, final_rect: Rect) -> Rect {
-        self.final_rect
-            .replace(self.controller.borrow_mut().arrange(self, final_rect));
+    pub fn final_rect(&self) -> Rect {
+        self.final_rect.unwrap()
+    }
+
+    pub fn measure(&mut self, available_size: Size) -> Size {
+        let available = self.sizing.calc_available_size(available_size);
+        let required = self.component.measure(available);
+        let final_size = self.sizing.calc_final_size(available, required);
+        self.final_size = Some(final_size);
+        final_size
+    }
+
+    pub fn arrange(&mut self, final_rect: Rect) -> Rect {
+        self.final_rect = Some(self.component.arrange(final_rect));
         self.visually_dirty = false;
         self.final_rect.unwrap()
     }
 
-    fn draw(&self, context: &mut DrawingContext) {
-        todo!()
+    pub fn arrange_from(&mut self, point: Point) -> Rect {
+        self.arrange(Rect::new(point, self.final_size.unwrap()))
+    }
+
+    pub fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
+        self.component.draw(context);
     }
 }
 
-pub trait ComponentSizingExt {
+impl InputHandler for Component {
+    fn on_key(&mut self, event: &KeyEvent) -> bool {
+        return if self.component.on_key_preview(event) {
+            true
+        } else {
+            self.component.on_key(event)
+        };
+    }
+
+    fn on_mouse_button(&mut self, event: &MouseButtonEvent) -> bool {
+        self.component.on_mouse_button(event)
+    }
+
+    fn on_mouse_wheel(&mut self, event: &MouseWheelEvent) -> bool {
+        self.component.on_mouse_wheel(event)
+    }
+
+    fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
+        self.component.on_cursor_moved(event)
+    }
+}
+
+trait ComponentSizingExt {
     fn calc_available_size(&self, available_size: Size) -> Size;
     fn calc_final_size(&self, available_size: Size, required_size: Size) -> Size;
 }
@@ -119,51 +168,3 @@ impl ComponentSizingExt for Sizing {
         }
     }
 }
-
-//#[inline]
-//pub fn calculate_available_size(sizing: &Sizing, available_size: Size) -> Size {
-//    Size {
-//        width: match sizing.width.desired {
-//            Length::Fit | Length::Fill => available_size
-//                .width
-//                .max(sizing.width.min)
-//                .min(sizing.width.max),
-//            Length::Fixed(pixels) => pixels,
-//        },
-//        height: match sizing.height.desired {
-//            Length::Fit | Length::Fill => available_size
-//                .height
-//                .max(sizing.height.min)
-//                .min(sizing.height.max),
-//            Length::Fixed(pixels) => pixels,
-//        },
-//    }
-//}
-//
-//#[inline]
-//pub fn calculate_final_size(sizing: &Sizing, available_size: Size, required_size: Size) -> Size {
-//    Size {
-//        width: match sizing.width.desired {
-//            Length::Fit => required_size
-//                .width
-//                .max(sizing.width.min)
-//                .min(sizing.width.max),
-//            Length::Fill => available_size
-//                .width
-//                .max(sizing.width.min)
-//                .min(sizing.width.max),
-//            Length::Fixed(pixels) => pixels,
-//        },
-//        height: match sizing.height.desired {
-//            Length::Fit => required_size
-//                .height
-//                .max(sizing.height.min)
-//                .min(sizing.height.max),
-//            Length::Fill => available_size
-//                .height
-//                .max(sizing.height.min)
-//                .min(sizing.height.max),
-//            Length::Fixed(pixels) => pixels,
-//        },
-//    }
-//}

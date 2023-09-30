@@ -12,6 +12,7 @@ pub mod controls;
 mod drawing;
 pub mod font;
 mod gfx;
+pub mod input_handling;
 pub mod layouts;
 mod scene;
 mod ui;
@@ -29,7 +30,8 @@ use glm::Vec4;
 use std::ops::*;
 use std::sync::Arc;
 use winit::dpi::PhysicalPosition;
-use winit::event::*;
+
+pub use num_traits::*;
 
 pub struct StringProperty {
     value: Arc<String>,
@@ -59,14 +61,6 @@ impl From<&str> for StringProperty {
 
 pub struct StringPropertyBinding {
     value: Arc<String>,
-}
-
-type KeyEvent = winit::event::KeyboardInput;
-
-#[derive(Debug, Copy, Clone)]
-pub struct MouseButtonEvent {
-    pub button: MouseButton,
-    pub state: ElementState,
 }
 
 #[derive(Debug, Default, Copy, Clone)]

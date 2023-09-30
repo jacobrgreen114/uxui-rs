@@ -1,6 +1,7 @@
 use crate::component::*;
 use crate::drawing::*;
 use crate::*;
+use input_handling::{InputHandler, PreviewInputHandler};
 
 pub struct InputBuilder {
     hint: Option<String>,
@@ -45,15 +46,11 @@ impl Input {
     }
 }
 
-impl Component for Input {
-    fn is_layout_dirty(&self) -> bool {
-        todo!()
-    }
+impl InputHandler for Input {}
 
-    fn is_visually_dirty(&self) -> bool {
-        todo!()
-    }
+impl PreviewInputHandler for Input {}
 
+impl ComponentController for Input {
     fn measure(&mut self, available_size: Size) -> Size {
         todo!()
     }

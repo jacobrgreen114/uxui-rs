@@ -1,18 +1,15 @@
 use crate::component::*;
 use crate::drawing::*;
 use crate::*;
+use input_handling::{InputHandler, PreviewInputHandler};
 
 pub struct Row {}
 
-impl Component for Row {
-    fn is_layout_dirty(&self) -> bool {
-        todo!()
-    }
+impl InputHandler for Row {}
 
-    fn is_visually_dirty(&self) -> bool {
-        todo!()
-    }
+impl PreviewInputHandler for Row {}
 
+impl ComponentController for Row {
     fn measure(&mut self, available_size: Size) -> Size {
         todo!()
     }

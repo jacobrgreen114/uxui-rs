@@ -1,9 +1,11 @@
 use super::window::*;
 use super::*;
 
+use crate::input_handling::*;
+
 use std::collections::HashMap;
 
-use winit::event::*;
+use winit::event::{Event, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::*;
 use winit::platform::run_return::EventLoopExtRunReturn;
 
@@ -44,7 +46,7 @@ pub trait ApplicationController: Sized + 'static {
 }
 
 struct ApplicationData {
-    windows: HashMap<winit::window::WindowId, Box<dyn Window>>,
+    windows: HashMap<winit::window::WindowId, Window>,
 }
 
 impl ApplicationData {
@@ -72,7 +74,7 @@ impl<'a> Application<'a> {
         }
     }
 
-    pub fn push_window(&mut self, window: Box<dyn Window>) {
+    pub fn push_window(&mut self, window: Window) {
         self.app_data.windows.insert(window.id(), window);
     }
 
@@ -133,37 +135,56 @@ impl<'a> Application<'a> {
                             WindowEvent::DroppedFile(_) => {}
                             WindowEvent::HoveredFile(_) => {}
                             WindowEvent::HoveredFileCancelled => {}
-                            WindowEvent::ReceivedCharacter(_) => {}
+                            WindowEvent::ReceivedCharacter(char) => {}
                             WindowEvent::Focused(_) => {}
                             WindowEvent::KeyboardInput { input, .. } => {
-                                window.key_event(input);
+                                if let Some(key) = input.virtual_keycode {
+                                    let event = KeyEvent {
+                                        key,
+                                        state: input.state,
+                                        _phantom: (),
+                                    };
+                                    window.on_key(&event);
+                                }
                             }
                             WindowEvent::ModifiersChanged(_) => {}
                             WindowEvent::Ime(_) => {}
                             WindowEvent::CursorMoved { position, .. } => {
-                                window.cursor_moved(position.into());
+                                let event = CursorMovedEvent {
+                                    pos: position.into(),
+                                    _phantom: (),
+                                };
+                                window.on_cursor_moved(&event);
                             }
                             WindowEvent::CursorEntered { .. } => {}
                             WindowEvent::CursorLeft { .. } => {}
-                            WindowEvent::MouseWheel { delta, .. } => match delta {
-                                MouseScrollDelta::LineDelta(x, y) => {
-                                    window.scroll(line_to_pixels(Delta::new(x, y)));
-                                }
-                                MouseScrollDelta::PixelDelta(pos) => {
-                                    window.scroll(Delta::new(pos.x as f32, pos.y as f32));
-                                }
-                            },
+                            WindowEvent::MouseWheel { delta, .. } => {
+                                let delta = match delta {
+                                    MouseScrollDelta::LineDelta(x, y) => Delta::new(x, y),
+                                    MouseScrollDelta::PixelDelta(pos) => {
+                                        Delta::new(pos.x as f32, pos.y as f32)
+                                    }
+                                };
+                                let event = MouseWheelEvent {
+                                    delta,
+                                    _phantom: (),
+                                };
+                                window.on_mouse_wheel(&event);
+                            }
                             WindowEvent::MouseInput { button, state, .. } => {
-                                window.mouse_button(MouseButtonEvent { button, state });
+                                let event = MouseButtonEvent {
+                                    button,
+                                    state,
+                                    _phantom: (),
+                                };
+                                window.on_mouse_button(&event);
                             }
                             WindowEvent::TouchpadMagnify { .. } => {}
                             WindowEvent::SmartMagnify { .. } => {}
                             WindowEvent::TouchpadRotate { .. } => {}
                             WindowEvent::TouchpadPressure { .. } => {}
                             WindowEvent::AxisMotion { .. } => {}
-                            WindowEvent::Touch(touch) => {
-                                eprintln!("Touch currently unsupported!");
-                            }
+                            WindowEvent::Touch(_) => {}
                             WindowEvent::ScaleFactorChanged { .. } => {}
                             WindowEvent::ThemeChanged(_) => {}
                             WindowEvent::Occluded(_) => {}

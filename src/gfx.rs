@@ -44,3 +44,13 @@ fn create_device_queue() -> (Device, Queue) {
     ))
     .unwrap()
 }
+
+pub(crate) fn single_submit(f: impl FnOnce(&mut CommandEncoder)) {
+    let device = get_device();
+    let queue = get_queue();
+    let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
+        label: Some("Uxui command encoder"),
+    });
+    f(&mut encoder);
+    queue.submit(Some(encoder.finish()));
+}

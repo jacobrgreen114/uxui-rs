@@ -44,7 +44,7 @@ impl LoginSceneController {
 }
 
 impl SceneController for LoginSceneController {
-    fn on_init(&mut self, scene: &Scene<Self>) {
+    fn on_init(&mut self, scene: &Scene) {
         let model = self.model.clone();
 
         let root = Column::build()
@@ -52,6 +52,7 @@ impl SceneController for LoginSceneController {
             .with_height(Length::Fill)
             .with_horizontal_alignment(HorizontalAlignment::Center)
             .with_children(vec![
+                Text::new("Hello world!"),
                 // Input::builder()
                 //     .with_hint("Username")
                 //     .with_binding(self.model.username.create_binding())
@@ -61,7 +62,7 @@ impl SceneController for LoginSceneController {
                 //     .with_binding(self.model.password.create_binding())
                 //     .build(),
                 Button::builder()
-                    .with_label("Login")
+                    // .with_label("Login")
                     .with_width(Length::Fixed(100.0))
                     .with_height(Length::Fixed(50.0))
                     .with_background(Color::new_rgb(0.0, 1.0, 0.0))
@@ -70,7 +71,7 @@ impl SceneController for LoginSceneController {
                     }))
                     .build(),
                 Button::builder()
-                    .with_label("Login2")
+                    // .with_label("Login2")
                     .with_width(Length::Fixed(500.0))
                     .with_height(Length::Fixed(50.0))
                     .with_background(Color::new_rgb(0.0, 1.0, 1.0))
@@ -91,7 +92,7 @@ impl ExampleWindowController {
 }
 
 impl WindowController for ExampleWindowController {
-    fn on_create(&mut self, window: &UiWindow<Self>) {
+    fn on_create(&mut self, window: &Window) {
         let login_scene = Scene::new(LoginSceneController::new());
         window.swap_scene(Some(login_scene));
         window.show();
@@ -102,6 +103,18 @@ impl WindowController for ExampleWindowController {
     }
 }
 
+static LOGIN_WINDOW_CONFIG: WindowConfig = WindowConfig {
+    title: Some("Login"),
+    size: Some(Size {
+        width: 640.0,
+        height: 480.0,
+    }),
+    pos: None,
+    decorations: true,
+    resizable: true,
+    transparent: false,
+};
+
 struct ExampleAppController {}
 
 impl ApplicationController for ExampleAppController {
@@ -110,23 +123,12 @@ impl ApplicationController for ExampleAppController {
     }
 
     fn on_start(&mut self, app: &mut Application) {
-        app.push_window(UiWindow::new(
+        app.push_window(Window::new(
             app,
-            &WindowConfig {
-                title: Some("Example Window"),
-                size: Some(Size {
-                    width: 640.0,
-                    height: 480.0,
-                }),
-                ..Default::default()
-            },
+            &LOGIN_WINDOW_CONFIG,
             ExampleWindowController::new(),
         ));
     }
-
-    // fn run_mode(&self) -> RunMode {
-    //     RunMode::Poll
-    // }
 }
 
 fn main() {

@@ -2,11 +2,19 @@ use freetype as ft;
 use freetype::ffi::FT_UShort;
 use std::cell::{RefCell, UnsafeCell};
 
+use freetype::{Bitmap, RenderMode};
+use gfx::{get_device, get_instance, get_queue, single_submit};
 use glm::Vec3;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::process::Output;
+use std::sync::{Arc, Mutex, RwLock};
+use wgpu::{
+    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, TextureDescriptor, TextureDimension,
+    TextureFormat, COPY_BUFFER_ALIGNMENT,
+};
 
 // #[cfg(target_os = "windows")]
 // const SYSTEM_FONT_PATH: &str = "C:/Windows/Fonts/";
@@ -19,6 +27,8 @@ const SYSTEM_FONT_PATH: &str = "/System/Library/Fonts/";
 
 static mut FREETYPE_LIBRARY: Option<ft::Library> = None;
 
+const DPI: u32 = 96;
+
 fn create_freetype_library() -> ft::Library {
     ft::Library::init().unwrap()
 }
@@ -27,9 +37,9 @@ pub(crate) fn get_freetype_library() -> &'static ft::Library {
     unsafe { FREETYPE_LIBRARY.get_or_insert_with(create_freetype_library) }
 }
 
-static mut FONT_CACHE: Option<HashMap<String, FontFamily>> = None;
+static mut FONT_CACHE: Option<HashMap<Box<str>, FontFamily>> = None;
 
-fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<String, FontFamily>, path: P) {
+fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<Box<str>, FontFamily>, path: P) {
     let library = get_freetype_library();
 
     for font_path in std::fs::read_dir(path).unwrap() {
@@ -58,17 +68,17 @@ fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<String, FontFamily>, path: P)
         let family_name = face.family_name().unwrap();
         let key = family_name.to_lowercase();
 
-        let family = if let Some(family) = cache.get_mut(&key) {
+        let family = if let Some(family) = cache.get_mut(key.as_str()) {
             family
         } else {
             cache.insert(
-                key.clone(),
+                key.clone().into(),
                 FontFamily {
                     name: family_name,
                     fonts: Vec::new(),
                 },
             );
-            cache.get_mut(&key).unwrap()
+            cache.get_mut(key.as_str()).unwrap()
         };
 
         family.fonts.push(Font::new(face));
@@ -76,7 +86,7 @@ fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<String, FontFamily>, path: P)
 }
 
 #[cfg(target_os = "windows")]
-fn create_font_cache() -> HashMap<String, FontFamily> {
+fn create_font_cache() -> HashMap<Box<str>, FontFamily> {
     let mut cache = HashMap::new();
 
     let system_font_path = PathBuf::from(std::env::var("WINDIR").unwrap()).join("Fonts");
@@ -92,7 +102,7 @@ fn create_font_cache() -> HashMap<String, FontFamily> {
     cache
 }
 
-pub fn get_font_cache() -> &'static mut HashMap<String, FontFamily> {
+pub fn get_font_cache() -> &'static mut HashMap<Box<str>, FontFamily> {
     unsafe { FONT_CACHE.get_or_insert_with(create_font_cache) }
 }
 
@@ -116,8 +126,8 @@ pub fn find_best_font(query: &BestFontQuery) -> Result<&'static Font, ()> {
 
     match query.query {
         FontQuery::FamilyName(family_name) => {
-            let family_name = family_name.to_lowercase();
-            if let Some(family) = cache.get(&family_name) {
+            let key = family_name.to_lowercase();
+            if let Some(family) = cache.get(key.as_str()) {
                 let font = match family.find_best_match(query.style) {
                     Ok(font) => font,
                     Err(error) => return Err(error),
@@ -139,8 +149,68 @@ pub fn find_best_font(query: &BestFontQuery) -> Result<&'static Font, ()> {
     }
 }
 
+fn align_size(size: usize, alignment: usize) -> usize {
+    if size % alignment == 0 {
+        size
+    } else {
+        size / alignment * alignment + alignment
+    }
+}
+
 #[derive(Debug)]
-pub struct Glyph {}
+pub struct Glyph {
+    texture: Option<wgpu::Texture>,
+    metrics: ft::GlyphMetrics,
+}
+
+impl Glyph {
+    fn new(bitmap: &Bitmap, metrics: ft::GlyphMetrics) -> Self {
+        let device = get_device();
+
+        let texture = if bitmap.buffer().len() == 0 {
+            None
+        } else {
+            let texture = device.create_texture(&TextureDescriptor {
+                label: Some("Glyph Texture"),
+                size: wgpu::Extent3d {
+                    width: bitmap.width() as u32,
+                    height: bitmap.rows() as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::R8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[TextureFormat::R8Unorm],
+            });
+
+            get_queue().write_texture(
+                ImageCopyTexture {
+                    texture: &texture,
+                    mip_level: 0,
+                    origin: Default::default(),
+                    aspect: Default::default(),
+                },
+                bitmap.buffer(),
+                ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bitmap.pitch() as u32),
+                    rows_per_image: Some(bitmap.rows() as u32),
+                },
+                texture.size(),
+            );
+
+            Some(texture)
+        };
+
+        Self { texture, metrics }
+    }
+
+    pub fn advance(&self) -> f32 {
+        self.metrics.horiAdvance as f32 / 64.0
+    }
+}
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct FontStyle {
@@ -161,9 +231,9 @@ impl FontStyle {
 
 #[derive(Debug)]
 pub struct Font {
-    face: ft::Face,
+    face: RwLock<ft::Face>,
     style: FontStyle,
-    glyphs: UnsafeCell<HashMap<char, Box<Glyph>>>,
+    glyphs: UnsafeCell<HashMap<char, Pin<Box<Glyph>>>>,
 }
 
 impl Font {
@@ -173,7 +243,7 @@ impl Font {
         let style = face.style_flags();
 
         Self {
-            face,
+            face: RwLock::new(face),
             style: FontStyle {
                 weight: FontWeight::from(os2.us_weight_class()),
                 width: FontWidth::from(os2.us_width_class()),
@@ -187,20 +257,40 @@ impl Font {
         }
     }
 
+    pub fn line_height(&self) -> f32 {
+        let face = self.face.read().unwrap();
+        face.height() as f32 / 64.0
+    }
+
     pub fn get_glyph(&self, codepoint: char) -> Result<&Glyph, ()> {
-        if let Some(glyph) = unsafe { &*self.glyphs.get() }.get(&codepoint) {
-            unsafe { Ok(&*(glyph.deref() as *const Glyph)) }
+        let glyph = if let Some(glyph) = unsafe { &mut *self.glyphs.get() }.get(&codepoint) {
+            glyph
         } else {
-            self.face
-                .load_glyph(
-                    self.face.get_char_index(codepoint as usize),
-                    ft::face::LoadFlag::RENDER,
-                )
+            let face = self.face.write().unwrap();
+
+            // face.set_char_size(0, 16 * 64, DPI, DPI).unwrap();
+
+            face.load_char(codepoint as usize, ft::face::LoadFlag::RENDER)
                 .unwrap();
 
-            todo!();
-            Err(())
-        }
+            let glyph_slot = face.glyph();
+
+            // note: this is a hack to get the glyph to render as an sdf
+            // todo: add 'SDF_RENDER_MODE_SDF' to freetype-rs and use that instead
+            glyph_slot
+                .render_glyph(unsafe { std::mem::transmute(5) })
+                .unwrap();
+
+            let metrics = glyph_slot.metrics();
+            let bitmap = glyph_slot.bitmap();
+
+            let glyph = Box::pin(Glyph::new(&bitmap, metrics));
+            let cache = unsafe { &mut *self.glyphs.get() };
+            cache.insert(codepoint, glyph);
+            cache.get(&codepoint).unwrap()
+        };
+
+        Ok(glyph.deref())
     }
 }
 

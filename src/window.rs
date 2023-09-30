@@ -1,7 +1,9 @@
 use crate::drawing::*;
 use crate::gfx::*;
+use crate::input_handling::*;
 use crate::scene::*;
 use crate::*;
+
 use std::cell::{Ref, RefCell};
 use std::ffi::c_void;
 use std::ops::Deref;
@@ -14,43 +16,44 @@ use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::*;
 
+use crate::input_handling::*;
 use wgpu::*;
 use winit::event::*;
 
-pub trait Window {
-    fn id(&self) -> WindowId;
-    fn resized(&mut self, size: Size);
-    fn moved(&mut self, pos: Point);
-    fn redraw_requested(&mut self);
-    fn close_requested(&mut self) -> bool;
-    fn close(&mut self);
-    fn closed(&mut self);
-    fn poll(&mut self);
+// pub trait Window {
+//     fn id(&self) -> WindowId;
+//     fn resized(&mut self, size: Size);
+//     fn moved(&mut self, pos: Point);
+//     fn redraw_requested(&mut self);
+//     fn close_requested(&mut self) -> bool;
+//     fn close(&mut self);
+//     fn closed(&mut self);
+//     fn poll(&mut self);
+//
+//     fn key_event(&mut self, event: KeyEvent);
+//     fn cursor_moved(&mut self, pos: Point);
+//     fn scroll(&mut self, delta: Delta);
+//     fn mouse_button(&mut self, event: MouseButtonEvent);
+// }
 
-    fn key_event(&mut self, event: KeyEvent);
-    fn cursor_moved(&mut self, pos: Point);
-    fn scroll(&mut self, delta: Delta);
-    fn mouse_button(&mut self, event: MouseButtonEvent);
-}
+// pub trait WindowBuilder {
+//     fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window>;
+// }
 
-pub trait WindowBuilder {
-    fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window>;
-}
+pub trait WindowController {
+    fn on_create(&mut self, _window: &Window) {}
 
-pub trait WindowController: Sized + 'static {
-    fn on_create(&mut self, _window: &UiWindow<Self>) {}
+    fn on_resize(&mut self, _window: &Window, _size: Size) {}
 
-    fn on_resize(&mut self, _window: &UiWindow<Self>, _size: Size) {}
+    fn on_moved(&mut self, _window: &Window, _pos: Point) {}
 
-    fn on_moved(&mut self, _window: &UiWindow<Self>, _pos: Point) {}
-
-    fn on_close(&mut self, _window: &UiWindow<Self>) -> bool {
+    fn on_close(&mut self, _window: &Window) -> bool {
         true
     }
 
-    fn on_closed(&mut self, _window: &UiWindow<Self>) {}
+    fn on_closed(&mut self, _window: &Window) {}
 
-    fn on_poll(&mut self, _window: &UiWindow<Self>) {}
+    fn on_poll(&mut self, _window: &Window) {}
 }
 
 pub struct WindowConfig<'a> {
@@ -161,53 +164,51 @@ where
     }
 }
 
-impl<C> WindowBuilder for UiWindowBuilder<C>
-where
-    C: WindowController,
-{
-    fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window> {
-        todo!();
-        // let window = self.builder.build(app.event_loop).unwrap();
-        // let surface = unsafe { get_instance().create_surface(&window).unwrap() };
-        // let mut s = Box::new(UiWindow {
-        //     window: Some(window),
-        //     surface: Some(surface),
-        //     surface_dirty: true,
-        //     controller: RefCell::new(()),
-        //     scene: RefCell::new(None),
-        // });
-        // s.redraw_requested();
-        // s.controller.borrow_mut().on_create(&s);
-        // s
-    }
-}
+// impl<C> WindowBuilder for UiWindowBuilder<C>
+// where
+//     C: WindowController,
+// {
+//     fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window> {
+//         todo!();
+//         // let window = self.builder.build(app.event_loop).unwrap();
+//         // let surface = unsafe { get_instance().create_surface(&window).unwrap() };
+//         // let mut s = Box::new(UiWindow {
+//         //     window: Some(window),
+//         //     surface: Some(surface),
+//         //     surface_dirty: true,
+//         //     controller: RefCell::new(()),
+//         //     scene: RefCell::new(None),
+//         // });
+//         // s.redraw_requested();
+//         // s.controller.borrow_mut().on_create(&s);
+//         // s
+//     }
+// }
 
-pub struct UiWindow<C>
-where
-    C: WindowController,
-{
+pub struct Window {
     window: Option<winit::window::Window>,
     surface: Option<Surface>,
     surface_dirty: bool,
-    controller: RefCell<C>,
-    scene: RefCell<Option<Box<dyn SceneInterface>>>,
+    controller: Box<RefCell<dyn WindowController>>,
+    scene: RefCell<Option<Scene>>,
 }
 
-impl<C> UiWindow<C>
-where
-    C: WindowController,
-{
-    pub fn new(app: &Application, config: &WindowConfig, controller: C) -> Box<Self> {
+impl Window {
+    pub fn new(
+        app: &Application,
+        config: &WindowConfig,
+        controller: impl WindowController + 'static,
+    ) -> Self {
         let window = config.to_builder().build(app.event_loop).unwrap();
         let surface = unsafe { get_instance().create_surface(&window).unwrap() };
 
-        let mut this = Box::new(Self {
+        let mut this = Self {
             window: Some(window),
             surface: Some(surface),
             surface_dirty: true,
-            controller: RefCell::new(controller),
+            controller: Box::new(RefCell::new(controller)),
             scene: RefCell::new(None),
-        });
+        };
         this.redraw_requested();
         this.controller.borrow_mut().on_create(&this);
         this
@@ -221,10 +222,7 @@ where
         self.window.as_ref().unwrap().set_visible(false);
     }
 
-    pub fn swap_scene(
-        &self,
-        mut scene: Option<Box<dyn SceneInterface>>,
-    ) -> Option<Box<dyn SceneInterface>> {
+    pub fn swap_scene(&self, mut scene: Option<Scene>) -> Option<Scene> {
         match scene.as_mut() {
             Some(scene) => {
                 scene.on_active();
@@ -273,45 +271,12 @@ where
 
         self.surface_dirty = false;
     }
-}
 
-fn find_best_format(capabilities: &SurfaceCapabilities) -> TextureFormat {
-    // todo : implement hdr compatibility
-    // if capabilities.formats.contains(&TextureFormat::Rgba16Float) {
-    //     return TextureFormat::Rgba16Float;
-    // }
-
-    if capabilities
-        .formats
-        .contains(&TextureFormat::Bgra8UnormSrgb)
-    {
-        return TextureFormat::Bgra8UnormSrgb;
-    }
-
-    *capabilities.formats.first().unwrap()
-}
-
-fn find_best_present_mode(capabilities: &SurfaceCapabilities) -> PresentMode {
-    if capabilities.present_modes.contains(&PresentMode::Mailbox) {
-        return PresentMode::Mailbox;
-    }
-
-    *capabilities.present_modes.first().unwrap()
-}
-
-fn find_best_alpha_mode(capabilities: &SurfaceCapabilities) -> CompositeAlphaMode {
-    *capabilities.alpha_modes.first().unwrap()
-}
-
-impl<C> Window for UiWindow<C>
-where
-    C: WindowController,
-{
-    fn id(&self) -> WindowId {
+    pub(crate) fn id(&self) -> WindowId {
         self.window.as_ref().unwrap().id()
     }
 
-    fn resized(&mut self, size: Size) {
+    pub(crate) fn resized(&mut self, size: Size) {
         self.controller.borrow_mut().on_resize(self, size);
         self.surface_dirty = true;
 
@@ -323,11 +288,11 @@ where
         self.window.as_ref().unwrap().request_redraw();
     }
 
-    fn moved(&mut self, pos: Point) {
+    pub(crate) fn moved(&mut self, pos: Point) {
         self.controller.borrow_mut().on_moved(self, pos);
     }
 
-    fn redraw_requested(&mut self) {
+    pub(crate) fn redraw_requested(&mut self) {
         if self.surface_dirty {
             self.update_surface();
         }
@@ -394,51 +359,218 @@ where
         texture.present();
     }
 
-    fn close_requested(&mut self) -> bool {
+    pub(crate) fn close_requested(&mut self) -> bool {
         self.controller.borrow_mut().on_close(self)
     }
 
-    fn close(&mut self) {
+    pub(crate) fn close(&mut self) {
         self.surface = None;
         self.window = None;
     }
 
-    fn closed(&mut self) {
+    pub(crate) fn closed(&mut self) {
         self.controller.borrow_mut().on_closed(self);
     }
 
-    fn poll(&mut self) {
+    pub(crate) fn poll(&mut self) {
         self.window.as_ref().unwrap().request_redraw();
     }
+}
 
-    fn key_event(&mut self, event: KeyEvent) {
+impl InputHandler for Window {
+    fn on_key(&mut self, event: &KeyEvent) -> bool {
         match self.scene.borrow_mut().as_mut() {
-            Some(scene) => scene.key_event(event),
-            None => {}
+            Some(scene) => scene.on_key(event),
+            None => false,
         }
     }
 
-    fn cursor_moved(&mut self, pos: Point) {
+    fn on_mouse_button(&mut self, event: &MouseButtonEvent) -> bool {
         match self.scene.borrow_mut().as_mut() {
-            Some(scene) => scene.cursor_moved(pos),
-            None => {}
+            Some(scene) => scene.on_mouse_button(event),
+            None => false,
         }
     }
 
-    fn scroll(&mut self, delta: Delta) {
+    fn on_mouse_wheel(&mut self, event: &MouseWheelEvent) -> bool {
         match self.scene.borrow_mut().as_mut() {
-            Some(scene) => scene.mouse_wheel_event(delta),
-            None => {}
+            Some(scene) => scene.on_mouse_wheel(event),
+            None => false,
         }
     }
 
-    fn mouse_button(&mut self, event: MouseButtonEvent) {
+    fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
         match self.scene.borrow_mut().as_mut() {
-            Some(scene) => scene.mouse_button_event(event),
-            None => {}
+            Some(scene) => scene.on_cursor_moved(event),
+            None => false,
         }
     }
 }
+
+fn find_best_format(capabilities: &SurfaceCapabilities) -> TextureFormat {
+    // todo : implement hdr compatibility
+    // if capabilities.formats.contains(&TextureFormat::Rgba16Float) {
+    //     return TextureFormat::Rgba16Float;
+    // }
+
+    if capabilities
+        .formats
+        .contains(&TextureFormat::Bgra8UnormSrgb)
+    {
+        return TextureFormat::Bgra8UnormSrgb;
+    }
+
+    capabilities.formats.first().unwrap().clone()
+}
+
+fn find_best_present_mode(capabilities: &SurfaceCapabilities) -> PresentMode {
+    if capabilities.present_modes.contains(&PresentMode::Mailbox) {
+        return PresentMode::Mailbox;
+    }
+
+    capabilities.present_modes.first().unwrap().clone()
+}
+
+fn find_best_alpha_mode(capabilities: &SurfaceCapabilities) -> CompositeAlphaMode {
+    capabilities.alpha_modes.first().unwrap().clone()
+}
+
+// impl<C> Window for UiWindow<C>
+// where
+//     C: WindowController,
+// {
+//     fn id(&self) -> WindowId {
+//         self.window.as_ref().unwrap().id()
+//     }
+//
+//     fn resized(&mut self, size: Size) {
+//         self.controller.borrow_mut().on_resize(self, size);
+//         self.surface_dirty = true;
+//
+//         if let Some(scene) = self.scene.borrow_mut().as_mut() {
+//             scene.on_canvas_size_changed(size);
+//         }
+//
+//         #[cfg(target_os = "macos")]
+//         self.window.as_ref().unwrap().request_redraw();
+//     }
+//
+//     fn moved(&mut self, pos: Point) {
+//         self.controller.borrow_mut().on_moved(self, pos);
+//     }
+//
+//     fn redraw_requested(&mut self) {
+//         if self.surface_dirty {
+//             self.update_surface();
+//         }
+//
+//         let mut scene = self.scene.borrow_mut();
+//         if let Some(scene) = scene.as_mut() {
+//             scene.update_layout(self.window.as_ref().unwrap().inner_size().into());
+//         }
+//
+//         let surface = self.surface.as_ref().unwrap();
+//
+//         let texture = surface.get_current_texture().unwrap();
+//         let view = texture
+//             .texture
+//             .create_view(&TextureViewDescriptor::default());
+//
+//         let device = get_device();
+//         let mut encoder = device.create_command_encoder(&Default::default());
+//
+//         let size = self.window.as_ref().unwrap().inner_size();
+//
+//         let buffer = UniformBuffer::new_initialized(UniformRenderInfo::new(size.into()));
+//
+//         let bind_group = device.create_bind_group(&BindGroupDescriptor {
+//             label: Some("Uxui Render Info Bind Group"),
+//             layout: get_uniform_binding_layout(),
+//             entries: &[BindGroupEntry {
+//                 binding: 0,
+//                 resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
+//             }],
+//         });
+//
+//         {
+//             let clear_color: wgpu::Color = match scene.as_ref() {
+//                 Some(scene) => scene.get_background_color().into(),
+//                 None => wgpu::Color::BLACK,
+//             };
+//
+//             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+//                 label: Some("Uxui Render Pass"),
+//                 color_attachments: &[Some(RenderPassColorAttachment {
+//                     view: &view,
+//                     resolve_target: None,
+//                     ops: Operations {
+//                         load: LoadOp::Clear(clear_color),
+//                         store: true,
+//                     },
+//                 })],
+//                 depth_stencil_attachment: None,
+//             });
+//
+//             render_pass.set_bind_group(0, &bind_group, &[]);
+//
+//             let mut drawing_context = DrawingContext::new(render_pass);
+//
+//             if let Some(scene) = scene.as_ref() {
+//                 scene.draw(&mut drawing_context);
+//             }
+//         }
+//
+//         let command = encoder.finish();
+//
+//         get_queue().submit(Some(command));
+//         texture.present();
+//     }
+//
+//     fn close_requested(&mut self) -> bool {
+//         self.controller.borrow_mut().on_close(self)
+//     }
+//
+//     fn close(&mut self) {
+//         self.surface = None;
+//         self.window = None;
+//     }
+//
+//     fn closed(&mut self) {
+//         self.controller.borrow_mut().on_closed(self);
+//     }
+//
+//     fn poll(&mut self) {
+//         self.window.as_ref().unwrap().request_redraw();
+//     }
+//
+//     fn key_event(&mut self, event: KeyEvent) {
+//         match self.scene.borrow_mut().as_mut() {
+//             Some(scene) => scene.key_event(event),
+//             None => {}
+//         }
+//     }
+//
+//     fn cursor_moved(&mut self, pos: Point) {
+//         match self.scene.borrow_mut().as_mut() {
+//             Some(scene) => scene.cursor_moved(pos),
+//             None => {}
+//         }
+//     }
+//
+//     fn scroll(&mut self, delta: Delta) {
+//         match self.scene.borrow_mut().as_mut() {
+//             Some(scene) => scene.mouse_wheel_event(delta),
+//             None => {}
+//         }
+//     }
+//
+//     fn mouse_button(&mut self, event: MouseButtonEvent) {
+//         match self.scene.borrow_mut().as_mut() {
+//             Some(scene) => scene.mouse_button_event(event),
+//             None => {}
+//         }
+//     }
+// }
 
 fn orthographic2d(left: f32, right: f32, bottom: f32, top: f32) -> Mat4 {
     orthographic(left, right, bottom, top, -1.0, 1.0)
