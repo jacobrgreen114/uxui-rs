@@ -1,18 +1,12 @@
 #version 450
 
-layout (set = 0, binding = 0) uniform RenderInfo {
-    mat4 Projection;
-//mat4 View;
-} renderInfo;
+#define VERTEX
 
-layout (set = 1, binding = 0) uniform Transform {
-    mat4 Model;
-    vec4 Color;
-} transform;
+#include "rect_bindings.glsl"
 
-layout(location = 0) out vec4 fragColor;
+layout(location = 0) out vec4 frag_color;
 
-vec2 positions[6] = vec2[](
+vec2 verticies[6] = vec2[](
 vec2(0.0, 0.0),
 vec2(0.0, 1.0),
 vec2(1.0, 0.0),
@@ -24,7 +18,7 @@ vec2(1.0, 1.0)
 
 
 void main() {
-    fragColor = transform.Color;
-    gl_Position = renderInfo.Projection * transform.Model * vec4(positions[gl_VertexIndex], 0.0f, 1.0f);
+    frag_color = rect_info.color_fill;
+    gl_Position = render_info.projection * rect_info.transform * vec4(verticies[gl_VertexIndex], 0.0f, 1.0f);
     // gl_Position = vec4(positions[gl_VertexIndex], 0.0f, 0.5f);
 }

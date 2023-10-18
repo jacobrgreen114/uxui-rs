@@ -91,6 +91,30 @@ impl Sub<Self> for Size {
     }
 }
 
+impl Mul<Self> for Size {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::new(self.width * rhs.width, self.height * rhs.height)
+    }
+}
+
+impl Div<Self> for Size {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self::new(self.width / rhs.width, self.height / rhs.height)
+    }
+}
+
+impl Neg for Size {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::new(-self.width, -self.height)
+    }
+}
+
 impl Mul<f32> for Size {
     type Output = Self;
 
@@ -138,6 +162,54 @@ impl Point {
     }
 }
 
+impl Add<Self> for Point {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.x + rhs.x, self.y + rhs.y)
+    }
+}
+
+impl Sub<Self> for Point {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+
+impl Mul<f32> for Point {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self::new(self.x * rhs, self.y * rhs)
+    }
+}
+
+impl Div<f32> for Point {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self::new(self.x / rhs, self.y / rhs)
+    }
+}
+
+impl Add<Size> for Point {
+    type Output = Self;
+
+    fn add(self, rhs: Size) -> Self::Output {
+        Self::new(self.x + rhs.width, self.y + rhs.height)
+    }
+}
+
+impl Sub<Size> for Point {
+    type Output = Self;
+
+    fn sub(self, rhs: Size) -> Self::Output {
+        Self::new(self.x - rhs.width, self.y - rhs.height)
+    }
+}
+
 impl From<winit::dpi::PhysicalPosition<i32>> for Point {
     fn from(pos: winit::dpi::PhysicalPosition<i32>) -> Self {
         Self {
@@ -153,14 +225,6 @@ impl From<PhysicalPosition<f64>> for Point {
             x: pos.x as f32,
             y: pos.y as f32,
         }
-    }
-}
-
-impl Add<Self> for Point {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.x + rhs.x, self.y + rhs.y)
     }
 }
 

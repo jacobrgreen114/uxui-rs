@@ -13,14 +13,14 @@ pub struct FontInfo {
     pub family: Box<str>,
     pub weight: FontWeight,
     pub width: FontWidth,
-    pub size: f32,
+    pub size: FontSize,
 }
 
 impl Default for FontInfo {
     fn default() -> Self {
         Self {
             family: DEFAULT_FONT_FAMILY.into(),
-            size: 12.0,
+            size: FontSize::em(1.0),
             weight: FontWeight::Normal,
             width: FontWidth::Normal,
         }
@@ -30,8 +30,8 @@ impl Default for FontInfo {
 pub struct Text {
     text: BindableString,
     font_info: FontInfo,
-    final_rect: Rect,
-    formatted_text: FormattedText,
+    cached_bb: Size,
+    formatted_text: Option<FormattedText>,
 }
 
 impl Text {
@@ -47,8 +47,8 @@ impl Text {
         ComponentBuilder::default().build(Text {
             text: BindableString::Static(text.into()),
             font_info,
-            final_rect: Rect::default(),
-            formatted_text: FormattedText::new(text, Point::new(0.0, 0.0), font),
+            cached_bb: Size::default(),
+            formatted_text: None,
         })
     }
 }
@@ -70,24 +70,43 @@ impl ComponentController for Text {
             // BindableString::Binding(binding) => todo!(),
         };
 
-        TextFormatter::calculate_bounding_box(text, font)
+        self.cached_bb = TextFormatter::calculate_bounding_box(text, font, self.font_info.size);
+        self.cached_bb
     }
 
     fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
-        self.final_rect = final_rect;
+        let text = match &self.text {
+            BindableString::Static(text) => text.as_str(),
+            // BindableString::Binding(binding) => todo!(),
+        };
+
+        let font = find_best_font(&BestFontQuery {
+            query: FontQuery::FamilyName(self.font_info.family.as_ref()),
+            style: Default::default(),
+        })
+        .unwrap();
+
+        self.formatted_text = Some(FormattedText::new(
+            text,
+            final_rect,
+            font,
+            self.font_info.size,
+        ));
         final_rect
     }
 
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
-        context.draw(&self.formatted_text);
+        context.draw(self.formatted_text.as_ref().unwrap());
     }
 }
 
 struct TextFormatter {}
 
 impl TextFormatter {
-    fn calculate_bounding_box(text: &str, font: &Font) -> Size {
-        let line_height = font.line_height();
+    fn calculate_bounding_box(text: &str, font: &Font, size: FontSize) -> Size {
+        let font_scale = calculate_font_scale(size.as_pt());
+
+        let line_height = font.line_height() * font_scale;
 
         let mut height: f32 = 0.0;
         let mut width: f32 = 0.0;
@@ -100,7 +119,7 @@ impl TextFormatter {
                 match c {
                     codepoint => {
                         let glyph = font.get_glyph(codepoint).unwrap();
-                        width += glyph.advance();
+                        width += glyph.advance() * font_scale;
                     }
                 }
             }

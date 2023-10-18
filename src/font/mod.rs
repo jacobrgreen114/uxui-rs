@@ -1,5 +1,5 @@
-use freetype as ft;
-use freetype::ffi::FT_UShort;
+use freetype::ffi::{FT_Size_Metrics, FT_UShort};
+use {freetype as ft, Size};
 
 use std::cell::{RefCell, UnsafeCell};
 
@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgpu::{ImageCopyTexture, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat};
+use Point;
 
 // #[cfg(target_os = "windows")]
 // const SYSTEM_FONT_PATH: &str = "C:/Windows/Fonts/";
@@ -25,6 +26,15 @@ const SYSTEM_FONT_PATH: &str = "/System/Library/Fonts/";
 
 const DPI: u32 = 96;
 
+pub(crate) const PT_PER_EM: f32 = 12.0;
+
+const RENDER_SIZE_EM: f32 = 8.0;
+const RENDER_SIZE_PT: f32 = RENDER_SIZE_EM * PT_PER_EM;
+
+pub(crate) fn calculate_font_scale(pt: f32) -> f32 {
+    pt / RENDER_SIZE_PT
+}
+
 static mut FREETYPE_LIBRARY: Option<ft::Library> = None;
 
 fn create_freetype_library() -> ft::Library {
@@ -35,18 +45,66 @@ pub(crate) fn get_freetype_library() -> &'static ft::Library {
     unsafe { FREETYPE_LIBRARY.get_or_insert_with(create_freetype_library) }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct FontSize {
+    size_em: f32,
+}
+
+impl FontSize {
+    pub fn pt(pt: f32) -> Self {
+        Self {
+            size_em: pt / PT_PER_EM,
+        }
+    }
+
+    pub fn px(px: f32) -> Self {
+        todo!()
+    }
+
+    pub fn em(em: f32) -> Self {
+        Self { size_em: em }
+    }
+
+    pub fn as_pt(&self) -> f32 {
+        self.size_em * PT_PER_EM
+    }
+
+    pub fn as_px(&self) -> f32 {
+        todo!()
+    }
+
+    pub fn as_em(&self) -> f32 {
+        self.size_em
+    }
+}
+
 static mut FONT_CACHE: Option<HashMap<Box<str>, FontFamily>> = None;
+
+trait FontFileExt {
+    fn is_font_file(&self) -> bool;
+}
+
+impl<T> FontFileExt for T
+where
+    T: AsRef<Path>,
+{
+    fn is_font_file(&self) -> bool {
+        let p = self.as_ref();
+        p.is_file()
+            && (p.extension().unwrap().eq_ignore_ascii_case("ttf")
+                || p.extension().unwrap().eq_ignore_ascii_case("otf"))
+    }
+}
 
 fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<Box<str>, FontFamily>, path: P) {
     let library = get_freetype_library();
 
     for font_path in std::fs::read_dir(path).unwrap() {
-        let mut face = match &font_path {
+        let face = match &font_path {
             Ok(entry) => {
-                let file_type = entry.file_type().unwrap();
                 let path = entry.path();
 
-                if !file_type.is_file() || !path.extension().unwrap().eq_ignore_ascii_case("ttf") {
+                if !path.is_font_file() {
                     continue;
                 }
                 match library.new_face(path, 0) {
@@ -155,12 +213,16 @@ fn align_size(size: usize, alignment: usize) -> usize {
 pub struct Glyph {
     texture: Option<wgpu::Texture>,
     texture_view: Option<wgpu::TextureView>,
+    bitmap_size: Size,
+    bitmap_offset: Point,
     metrics: ft::GlyphMetrics,
 }
 
 impl Glyph {
-    fn new(bitmap: &ft::Bitmap, metrics: ft::GlyphMetrics) -> Self {
+    fn new(glyph: &ft::GlyphSlot) -> Self {
         let device = get_device();
+
+        let bitmap = glyph.bitmap();
 
         let texture = if bitmap.buffer().len() == 0 {
             None
@@ -206,12 +268,32 @@ impl Glyph {
         Self {
             texture,
             texture_view,
-            metrics,
+            bitmap_size: Size::new(bitmap.width() as f32, bitmap.rows() as f32),
+            bitmap_offset: Point::new(glyph.bitmap_left() as f32, glyph.bitmap_top() as f32),
+            metrics: glyph.metrics(),
         }
     }
 
     pub fn advance(&self) -> f32 {
         self.metrics.horiAdvance as f32 / 64.0
+    }
+
+    pub fn size(&self) -> Size {
+        Size::new(
+            self.metrics.width as f32 / 64.0,
+            self.metrics.height as f32 / 64.0,
+        )
+    }
+
+    pub fn bearing(&self) -> Point {
+        Point::new(
+            self.metrics.horiBearingX as f32 / 64.0,
+            self.metrics.horiBearingY as f32 / 64.0,
+        )
+    }
+
+    pub fn texture_size(&self) -> Size {
+        self.bitmap_size
     }
 
     pub(crate) fn texture(&self) -> Option<&wgpu::Texture> {
@@ -245,7 +327,7 @@ pub struct Font {
     face: RwLock<Option<ft::Face>>,
     style: FontStyle,
     glyphs: UnsafeCell<HashMap<char, Pin<Box<Glyph>>>>,
-    line_height: f32,
+    metrics: FT_Size_Metrics,
 }
 
 impl Font {
@@ -254,7 +336,13 @@ impl Font {
 
         let style = face.style_flags();
 
-        // face.set_char_size(0, 16 * 64, 72, 72).unwrap();
+        face.set_char_size(
+            (RENDER_SIZE_PT * 64.0) as isize,
+            (RENDER_SIZE_PT * 64.0) as isize,
+            DPI,
+            DPI,
+        )
+        .unwrap();
 
         Self {
             path: path.into(),
@@ -269,12 +357,20 @@ impl Font {
                 },
             },
             glyphs: UnsafeCell::new(HashMap::new()),
-            line_height: face.height() as f32 / 64.0,
+            metrics: face.size_metrics().unwrap(),
         }
     }
 
+    pub fn ascent(&self) -> f32 {
+        self.metrics.ascender as f32 / 64.0
+    }
+
+    pub fn descent(&self) -> f32 {
+        self.metrics.descender as f32 / 64.0
+    }
+
     pub fn line_height(&self) -> f32 {
-        self.line_height
+        self.metrics.height as f32 / 64.0
     }
 
     pub fn get_glyph(&self, codepoint: char) -> Result<&Glyph, ()> {
@@ -286,7 +382,13 @@ impl Font {
             let lock = self.face.write().unwrap();
             let face = lock.as_ref().unwrap();
 
-            // face.set_char_size(0, 16 * 64, DPI, DPI).unwrap();
+            face.set_char_size(
+                (RENDER_SIZE_PT * 64.0) as isize,
+                (RENDER_SIZE_PT * 64.0) as isize,
+                DPI,
+                DPI,
+            )
+            .unwrap();
 
             face.load_char(codepoint as usize, ft::face::LoadFlag::RENDER)
                 .unwrap();
@@ -295,14 +397,13 @@ impl Font {
 
             // note: this is a hack to get the glyph to render as an sdf
             // todo: add 'SDF_RENDER_MODE_SDF' to freetype-rs and use that instead
-            glyph_slot
-                .render_glyph(unsafe { std::mem::transmute(5) })
-                .unwrap();
+            if !codepoint.is_whitespace() {
+                glyph_slot
+                    .render_glyph(unsafe { std::mem::transmute(5) })
+                    .unwrap();
+            }
 
-            let metrics = glyph_slot.metrics();
-            let bitmap = glyph_slot.bitmap();
-
-            let glyph = Box::pin(Glyph::new(&bitmap, metrics));
+            let glyph = Box::pin(Glyph::new(glyph_slot));
             let cache = unsafe { &mut *self.glyphs.get() };
             cache.insert(codepoint, glyph);
             cache.get(&codepoint).unwrap()

@@ -14,8 +14,6 @@ fn main() {
 
     let build_file_metadata = build_dir.join("build.rs").metadata().unwrap();
 
-    println!("{:?}", build_file_metadata);
-
     SHADERS.iter().for_each(|&shader| {
         let source_path = build_dir.join(shader);
         assert!(

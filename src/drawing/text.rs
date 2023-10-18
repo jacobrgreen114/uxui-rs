@@ -2,6 +2,7 @@ use super::*;
 use crate::font::Font;
 use crate::gfx::*;
 use drawing::{Drawable, UniformBuffer};
+use font::FontSize;
 use freetype::glyph;
 use glm::{Mat4, Vec4};
 use lazy_static::lazy_static;
@@ -63,37 +64,68 @@ impl Drawable for Glyph {
 pub struct FormattedText {
     text: Box<str>,
     font: &'static Font,
-    origin: Point,
+    size: ::font::FontSize,
+    rect: Rect,
     glyphs: Vec<Glyph>,
 }
 
 impl FormattedText {
-    pub fn new(text: &str, origin: Point, font: &'static Font) -> Self {
+    // todo: implement text alignment
+    pub fn new(text: &str, rect: Rect, font: &'static Font, size: FontSize) -> Self {
         let mut glyphs = Vec::new();
 
-        let mut pos = origin;
+        let font_scale = ::font::calculate_font_scale(size.as_pt());
+        let line_height = font.line_height() * font_scale;
+        let accent = font.ascent() * font_scale;
+        //let decent = font.descent() * font_scale;
+
+        let mut pos = rect.pos;
+        pos.y = pos.y - line_height + accent;
 
         for line in text.lines() {
             for c in line.chars() {
+                if c.is_control() {
+                    continue;
+                }
+
                 let glyph = font.get_glyph(c).unwrap();
                 if let Some(texture_view) = glyph.texture_view() {
-                    glyphs.push(Glyph::new(
-                        Rect::new(pos, Size::new(16.0, 24.0)),
-                        texture_view,
-                    ));
+                    let size = glyph.size() * font_scale;
+                    let mut off = glyph.bearing() * font_scale;
+                    off.y = -off.y;
+
+                    let tex_scale = glyph.texture_size() / glyph.size();
+                    let tex_off = -(size * tex_scale - size) / 2.0;
+
+                    let p = pos + off + tex_off;
+                    let s = size * tex_scale;
+
+                    let mut rect = Rect::new(p, s);
+                    rect.pos.y = rect.pos.y + line_height;
+
+                    glyphs.push(Glyph::new(rect, texture_view));
                 }
-                pos.x += glyph.advance();
+                pos.x += glyph.advance() * font_scale;
             }
-            pos.x = origin.x;
-            pos.y += font.line_height();
+            pos.x = rect.pos.x;
+            pos.y += line_height;
         }
 
         Self {
             text: text.into(),
             font,
-            origin,
+            size,
+            rect,
             glyphs,
         }
+    }
+
+    pub fn update_pos(&mut self, origin: Point) {
+        todo!()
+    }
+
+    pub fn update_text(&mut self, text: &str) {
+        todo!()
     }
 }
 
