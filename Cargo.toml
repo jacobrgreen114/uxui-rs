@@ -6,18 +6,14 @@ authors = [ "Jacob Green" ]
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/jacobrgreen114/uxui-rs"
-
+build = "build.rs"
 
 [dependencies]
 winit = "0.28"
 wgpu = { version = "0.17", features = ["default", "spirv"] }
 glm = "0.2"
-freetype-rs = "0.32.0"
-inline-spirv = "0.1"
+freetype-rs = "0.32"
 futures = "0.3"
 num-traits = "0.2"
-
-[[bin]]
-name = "uxui-example"
-path = "examples/basic/src/main.rs"
-
+lazy_static = "1.4"
+# xgfx = { path = "../xgfx" }

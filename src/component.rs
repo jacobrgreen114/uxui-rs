@@ -6,12 +6,26 @@ use input_handling::{
 };
 use std::cell::{RefCell, UnsafeCell};
 
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Visibility {
+    Visible,
+    Hidden,
+    Collapsed,
+}
+
+impl Default for Visibility {
+    fn default() -> Self {
+        Self::Visible
+    }
+}
+
 pub trait ComponentController: PreviewInputHandler {
     // fn is_layout_dirty(&self) -> bool;
     // fn is_visually_dirty(&self) -> bool;
 
-    fn measure(&mut self, available_size: Size) -> Size;
-    fn arrange(&mut self, final_rect: Rect) -> Rect;
+    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size;
+    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect;
 
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>);
 }
@@ -41,24 +55,44 @@ impl ComponentBuilder {
     pub fn build(self, controller: impl ComponentController + 'static) -> Component {
         Component {
             sizing: self.sizing,
-            component: Box::new(controller),
-            // children: Vec::new(),
+            controller: Box::new(controller),
+            children: ComponentChildren::None,
             visually_dirty: true,
             layout_dirty: true,
-            final_size: None,
-            final_rect: None,
+            final_size: Default::default(),
+            final_rect: Default::default(),
+            visibility: Default::default(),
+        }
+    }
+}
+
+enum ComponentChildren {
+    None,
+    Single(Box<Component>),
+    Static(&'static [Component]),
+    Owned(Vec<Component>),
+}
+
+impl ComponentChildren {
+    fn as_slice(&self) -> &[Component] {
+        match self {
+            ComponentChildren::None => &[],
+            ComponentChildren::Single(child) => std::slice::from_ref(child),
+            ComponentChildren::Static(children) => children,
+            ComponentChildren::Owned(children) => children,
         }
     }
 }
 
 pub struct Component {
-    component: Box<dyn ComponentController>,
+    controller: Box<dyn ComponentController>,
     sizing: Sizing,
-    // children: Vec<Component>,
-    final_size: Option<Size>,
-    final_rect: Option<Rect>,
+    children: ComponentChildren,
+    final_size: Size,
+    final_rect: Rect,
     visually_dirty: bool,
     layout_dirty: bool,
+    visibility: Visibility,
 }
 
 impl Component {
@@ -71,55 +105,75 @@ impl Component {
     }
 
     pub fn final_size(&self) -> Size {
-        self.final_size.unwrap()
+        self.final_size
     }
 
     pub fn final_rect(&self) -> Rect {
-        self.final_rect.unwrap()
+        self.final_rect
     }
 
     pub fn measure(&mut self, available_size: Size) -> Size {
-        let available = self.sizing.calc_available_size(available_size);
-        let required = self.component.measure(available);
-        let final_size = self.sizing.calc_final_size(available, required);
-        self.final_size = Some(final_size);
-        final_size
+        match self.visibility {
+            Visibility::Collapsed => Size::zero(),
+            _ => {
+                let available = self.sizing.calc_available_size(available_size);
+                let required = self.controller.measure(available, self.children.as_slice());
+                let final_size = self.sizing.calc_final_size(available, required);
+                self.final_size = final_size;
+                final_size
+            }
+        }
     }
 
     pub fn arrange(&mut self, final_rect: Rect) -> Rect {
-        self.final_rect = Some(self.component.arrange(final_rect));
-        self.visually_dirty = false;
-        self.final_rect.unwrap()
+        match self.visibility {
+            Visibility::Collapsed => Rect::new(final_rect.pos, Size::zero()),
+            _ => {
+                self.final_rect = self
+                    .controller
+                    .arrange(final_rect, self.children.as_slice());
+                self.visually_dirty = false;
+                self.final_rect
+            }
+        }
     }
 
     pub fn arrange_from(&mut self, point: Point) -> Rect {
-        self.arrange(Rect::new(point, self.final_size.unwrap()))
+        self.arrange(Rect::new(point, self.final_size))
     }
 
     pub fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
-        self.component.draw(context);
+        match self.visibility {
+            Visibility::Visible => {
+                self.controller.draw(context);
+            }
+            Visibility::Hidden => {}
+            Visibility::Collapsed => {}
+        }
+
+        self.controller.draw(context);
     }
 }
 
 impl InputHandler for Component {
     fn on_key(&mut self, event: &KeyEvent) -> bool {
-        return if self.component.on_key_preview(event) {
+        return if self.controller.on_key_preview(event) {
             true
         } else {
-            self.component.on_key(event)
+            self.controller.on_key(event)
         };
     }
 
     fn on_mouse_button(&mut self, event: &MouseButtonEvent) -> bool {
-        self.component.on_mouse_button(event)
+        self.controller.on_mouse_button(event)
     }
 
     fn on_mouse_wheel(&mut self, event: &MouseWheelEvent) -> bool {
-        self.component.on_mouse_wheel(event)
+        self.controller.on_mouse_wheel(event)
     }
 
     fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
-        self.component.on_cursor_moved(event)
+        self.controller.on_cursor_moved(event)
     }
 }
 

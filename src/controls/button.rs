@@ -1,6 +1,7 @@
 use crate::drawing::*;
 use crate::*;
 use input_handling::{InputHandler, KeyEvent, MouseButtonEvent, PreviewInputHandler};
+// use wgpu::core::command::ComputePass;
 
 use crate::component::*;
 
@@ -69,14 +70,14 @@ impl InputHandler for Button {
 impl PreviewInputHandler for Button {}
 
 impl ComponentController for Button {
-    fn measure(&mut self, available_size: Size) -> Size {
+    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
         match &mut self.content {
             Some(content) => content.measure(available_size),
             None => Size::zero(),
         }
     }
 
-    fn arrange(&mut self, final_rect: Rect) -> Rect {
+    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
         let _content_rect = match &mut self.content {
             Some(content) => content.arrange(final_rect),
             None => Rect::default(),

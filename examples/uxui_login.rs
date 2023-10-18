@@ -1,17 +1,21 @@
 #![windows_subsystem = "windows"]
 
+extern crate lazy_static;
 extern crate uxui;
 
-use std::cell::{RefCell, UnsafeCell};
+use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::RwLock;
+use std::time::Instant;
+
+use lazy_static::lazy_static;
+
 use uxui::controls::*;
 use uxui::layouts::*;
 use uxui::*;
 
-use std::time::Instant;
-
-static mut TIMER: Option<Instant> = None;
+lazy_static! {
+    static ref START_TIME: Instant = Instant::now();
+}
 
 struct LoginModel {
     username: StringProperty,
@@ -52,7 +56,7 @@ impl SceneController for LoginSceneController {
             .with_height(Length::Fill)
             .with_horizontal_alignment(HorizontalAlignment::Center)
             .with_children(vec![
-                Text::new("Hello world!"),
+                Text::new("Hello, world!"),
                 // Input::builder()
                 //     .with_hint("Username")
                 //     .with_binding(self.model.username.create_binding())
@@ -96,10 +100,7 @@ impl WindowController for ExampleWindowController {
         let login_scene = Scene::new(LoginSceneController::new());
         window.swap_scene(Some(login_scene));
         window.show();
-        println!(
-            "Window time to show: {:?}",
-            unsafe { TIMER }.unwrap().elapsed()
-        );
+        println!("Window time to show: {:?}", START_TIME.elapsed());
     }
 }
 
@@ -132,9 +133,6 @@ impl ApplicationController for ExampleAppController {
 }
 
 fn main() {
-    unsafe {
-        TIMER = Some(Instant::now());
-    }
-
+    lazy_static::initialize(&START_TIME);
     Application::run::<ExampleAppController>()
 }

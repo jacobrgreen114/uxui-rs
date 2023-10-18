@@ -1,6 +1,6 @@
 extern crate freetype;
 extern crate glm;
-extern crate inline_spirv;
+extern crate lazy_static;
 extern crate num_traits;
 extern crate wgpu;
 extern crate winit;
@@ -251,6 +251,7 @@ impl Color {
     }
 
     pub const TRANSPARENT: Self = Self::new(0.0, 0.0, 0.0, 0.0);
+    pub const BLACK: Self = Self::new(0.0, 0.0, 0.0, 1.0);
 }
 
 impl Into<Vec4> for Color {
@@ -311,7 +312,7 @@ pub struct Sizing {
 
 pub enum BindableString {
     Static(String),
-    Binding(StringPropertyBinding),
+    // Binding(StringPropertyBinding),
 }
 
 impl Default for BindableString {

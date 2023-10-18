@@ -13,32 +13,10 @@ use glm::*;
 use num_traits::identities::One;
 
 use winit::dpi::{LogicalPosition, LogicalSize};
-use winit::event_loop::EventLoopWindowTarget;
 use winit::window::*;
 
 use crate::input_handling::*;
 use wgpu::*;
-use winit::event::*;
-
-// pub trait Window {
-//     fn id(&self) -> WindowId;
-//     fn resized(&mut self, size: Size);
-//     fn moved(&mut self, pos: Point);
-//     fn redraw_requested(&mut self);
-//     fn close_requested(&mut self) -> bool;
-//     fn close(&mut self);
-//     fn closed(&mut self);
-//     fn poll(&mut self);
-//
-//     fn key_event(&mut self, event: KeyEvent);
-//     fn cursor_moved(&mut self, pos: Point);
-//     fn scroll(&mut self, delta: Delta);
-//     fn mouse_button(&mut self, event: MouseButtonEvent);
-// }
-
-// pub trait WindowBuilder {
-//     fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window>;
-// }
 
 pub trait WindowController {
     fn on_create(&mut self, _window: &Window) {}
@@ -164,33 +142,13 @@ where
     }
 }
 
-// impl<C> WindowBuilder for UiWindowBuilder<C>
-// where
-//     C: WindowController,
-// {
-//     fn build(self, event_loop: &EventLoopWindowTarget<()>) -> Box<dyn Window> {
-//         todo!();
-//         // let window = self.builder.build(app.event_loop).unwrap();
-//         // let surface = unsafe { get_instance().create_surface(&window).unwrap() };
-//         // let mut s = Box::new(UiWindow {
-//         //     window: Some(window),
-//         //     surface: Some(surface),
-//         //     surface_dirty: true,
-//         //     controller: RefCell::new(()),
-//         //     scene: RefCell::new(None),
-//         // });
-//         // s.redraw_requested();
-//         // s.controller.borrow_mut().on_create(&s);
-//         // s
-//     }
-// }
-
 pub struct Window {
     window: Option<winit::window::Window>,
     surface: Option<Surface>,
     surface_dirty: bool,
     controller: Box<RefCell<dyn WindowController>>,
     scene: RefCell<Option<Scene>>,
+    client_area: Size,
 }
 
 impl Window {
@@ -208,6 +166,7 @@ impl Window {
             surface_dirty: true,
             controller: Box::new(RefCell::new(controller)),
             scene: RefCell::new(None),
+            client_area: Size::default(),
         };
         this.redraw_requested();
         this.controller.borrow_mut().on_create(&this);
@@ -247,25 +206,13 @@ impl Window {
 
         let surface = self.surface.as_ref().unwrap();
 
-        // let capabilities = surface.get_capabilities(get_adapter());
-        //
-        // let format = find_best_format(&capabilities);
-        // let present_mode = find_best_present_mode(&capabilities);
-        // let alpha_mode = find_best_alpha_mode(&capabilities);
-        let size = self.window.as_ref().unwrap().inner_size();
-
         let config = surface
-            .get_default_config(get_adapter(), size.width, size.height)
+            .get_default_config(
+                get_adapter(),
+                self.client_area.width as u32,
+                self.client_area.height as u32,
+            )
             .unwrap();
-        // let config = SurfaceConfiguration {
-        //     usage: TextureUsages::RENDER_ATTACHMENT,
-        //     format,
-        //     width: size.width,
-        //     height: size.height,
-        //     present_mode,
-        //     alpha_mode,
-        //     view_formats: vec![],
-        // };
 
         surface.configure(get_device(), &config);
 
@@ -277,6 +224,7 @@ impl Window {
     }
 
     pub(crate) fn resized(&mut self, size: Size) {
+        self.client_area = size;
         self.controller.borrow_mut().on_resize(self, size);
         self.surface_dirty = true;
 
@@ -293,6 +241,10 @@ impl Window {
     }
 
     pub(crate) fn redraw_requested(&mut self) {
+        if self.client_area.width <= 0.0 || self.client_area.height <= 0.0 {
+            return;
+        }
+
         if self.surface_dirty {
             self.update_surface();
         }
@@ -318,11 +270,17 @@ impl Window {
 
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
             label: Some("Uxui Render Info Bind Group"),
-            layout: get_uniform_binding_layout(),
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
-            }],
+            layout: &RENDER_INFO_BIND_LAYOUT,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::Sampler(&GLOBAL_SAMPLER),
+                },
+            ],
         });
 
         {
@@ -434,143 +392,6 @@ fn find_best_present_mode(capabilities: &SurfaceCapabilities) -> PresentMode {
 fn find_best_alpha_mode(capabilities: &SurfaceCapabilities) -> CompositeAlphaMode {
     capabilities.alpha_modes.first().unwrap().clone()
 }
-
-// impl<C> Window for UiWindow<C>
-// where
-//     C: WindowController,
-// {
-//     fn id(&self) -> WindowId {
-//         self.window.as_ref().unwrap().id()
-//     }
-//
-//     fn resized(&mut self, size: Size) {
-//         self.controller.borrow_mut().on_resize(self, size);
-//         self.surface_dirty = true;
-//
-//         if let Some(scene) = self.scene.borrow_mut().as_mut() {
-//             scene.on_canvas_size_changed(size);
-//         }
-//
-//         #[cfg(target_os = "macos")]
-//         self.window.as_ref().unwrap().request_redraw();
-//     }
-//
-//     fn moved(&mut self, pos: Point) {
-//         self.controller.borrow_mut().on_moved(self, pos);
-//     }
-//
-//     fn redraw_requested(&mut self) {
-//         if self.surface_dirty {
-//             self.update_surface();
-//         }
-//
-//         let mut scene = self.scene.borrow_mut();
-//         if let Some(scene) = scene.as_mut() {
-//             scene.update_layout(self.window.as_ref().unwrap().inner_size().into());
-//         }
-//
-//         let surface = self.surface.as_ref().unwrap();
-//
-//         let texture = surface.get_current_texture().unwrap();
-//         let view = texture
-//             .texture
-//             .create_view(&TextureViewDescriptor::default());
-//
-//         let device = get_device();
-//         let mut encoder = device.create_command_encoder(&Default::default());
-//
-//         let size = self.window.as_ref().unwrap().inner_size();
-//
-//         let buffer = UniformBuffer::new_initialized(UniformRenderInfo::new(size.into()));
-//
-//         let bind_group = device.create_bind_group(&BindGroupDescriptor {
-//             label: Some("Uxui Render Info Bind Group"),
-//             layout: get_uniform_binding_layout(),
-//             entries: &[BindGroupEntry {
-//                 binding: 0,
-//                 resource: BindingResource::Buffer(buffer.as_ref().as_entire_buffer_binding()),
-//             }],
-//         });
-//
-//         {
-//             let clear_color: wgpu::Color = match scene.as_ref() {
-//                 Some(scene) => scene.get_background_color().into(),
-//                 None => wgpu::Color::BLACK,
-//             };
-//
-//             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-//                 label: Some("Uxui Render Pass"),
-//                 color_attachments: &[Some(RenderPassColorAttachment {
-//                     view: &view,
-//                     resolve_target: None,
-//                     ops: Operations {
-//                         load: LoadOp::Clear(clear_color),
-//                         store: true,
-//                     },
-//                 })],
-//                 depth_stencil_attachment: None,
-//             });
-//
-//             render_pass.set_bind_group(0, &bind_group, &[]);
-//
-//             let mut drawing_context = DrawingContext::new(render_pass);
-//
-//             if let Some(scene) = scene.as_ref() {
-//                 scene.draw(&mut drawing_context);
-//             }
-//         }
-//
-//         let command = encoder.finish();
-//
-//         get_queue().submit(Some(command));
-//         texture.present();
-//     }
-//
-//     fn close_requested(&mut self) -> bool {
-//         self.controller.borrow_mut().on_close(self)
-//     }
-//
-//     fn close(&mut self) {
-//         self.surface = None;
-//         self.window = None;
-//     }
-//
-//     fn closed(&mut self) {
-//         self.controller.borrow_mut().on_closed(self);
-//     }
-//
-//     fn poll(&mut self) {
-//         self.window.as_ref().unwrap().request_redraw();
-//     }
-//
-//     fn key_event(&mut self, event: KeyEvent) {
-//         match self.scene.borrow_mut().as_mut() {
-//             Some(scene) => scene.key_event(event),
-//             None => {}
-//         }
-//     }
-//
-//     fn cursor_moved(&mut self, pos: Point) {
-//         match self.scene.borrow_mut().as_mut() {
-//             Some(scene) => scene.cursor_moved(pos),
-//             None => {}
-//         }
-//     }
-//
-//     fn scroll(&mut self, delta: Delta) {
-//         match self.scene.borrow_mut().as_mut() {
-//             Some(scene) => scene.mouse_wheel_event(delta),
-//             None => {}
-//         }
-//     }
-//
-//     fn mouse_button(&mut self, event: MouseButtonEvent) {
-//         match self.scene.borrow_mut().as_mut() {
-//             Some(scene) => scene.mouse_button_event(event),
-//             None => {}
-//         }
-//     }
-// }
 
 fn orthographic2d(left: f32, right: f32, bottom: f32, top: f32) -> Mat4 {
     orthographic(left, right, bottom, top, -1.0, 1.0)

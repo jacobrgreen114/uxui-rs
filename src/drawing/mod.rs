@@ -3,6 +3,7 @@ mod text;
 
 pub use self::rect::*;
 pub use self::text::*;
+use std::borrow::Cow;
 
 use crate::gfx::*;
 
@@ -14,7 +15,10 @@ use glm::*;
 use num_traits::identities::One;
 
 use wgpu;
+use wgpu::{include_spirv, include_spirv_raw, BufferSize, ShaderSource};
 use Rect;
+
+use lazy_static::lazy_static;
 
 pub trait Drawable {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>);
@@ -116,19 +120,13 @@ where
         }
     }
 
-    pub fn update(&mut self, data: T) {
-        let staging_buffer = StagingBuffer::new_initialized(data);
-
-        let mut encoder = get_device().create_command_encoder(&Default::default());
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer.buffer,
-            0,
-            &self.buffer,
-            0,
-            size_of::<T>() as u64,
-        );
-        get_queue().submit(Some(encoder.finish()));
+    pub fn update(&mut self, data: &T) {
+        get_queue().write_buffer(&self.buffer, 0, unsafe { to_slice(data) });
     }
+}
+
+unsafe fn to_slice<T>(data: &T) -> &[u8] {
+    std::slice::from_raw_parts(data as *const T as *const u8, size_of::<T>())
 }
 
 impl<T> AsRef<wgpu::Buffer> for Buffer<T>
@@ -163,7 +161,7 @@ where
         }
     }
 
-    pub fn update(&mut self, data: T) {
+    pub fn update(&mut self, data: &T) {
         self.buffer.update(data);
     }
 }
@@ -188,121 +186,42 @@ fn model_projection(rect: Rect, rotation: f32) -> Mat4 {
     mat
 }
 
-static UNIFORM_BINDING_LAYOUT_DESCRIPTOR: wgpu::BindGroupLayoutDescriptor =
-    wgpu::BindGroupLayoutDescriptor {
-        label: Some("Rectangle Binding Layout"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
-    };
-
-static mut UNIFORM_BINDING_LAYOUT: Option<wgpu::BindGroupLayout> = None;
-
-fn create_uniform_binding_layout() -> wgpu::BindGroupLayout {
-    get_device().create_bind_group_layout(&UNIFORM_BINDING_LAYOUT_DESCRIPTOR)
-}
-
-pub(crate) fn get_uniform_binding_layout() -> &'static wgpu::BindGroupLayout {
-    unsafe { UNIFORM_BINDING_LAYOUT.get_or_insert_with(create_uniform_binding_layout) }
-}
-
-static RECT_VERT_SPIRV: &[u8] = include_bytes!("../../shaders/compiled/rect.vert.spv");
-static RECT_FRAG_SPIRV: &[u8] = include_bytes!("../../shaders/compiled/rect.frag.spv");
-
-// static RECT_VERT_SPIRV: &[u32] = include_spirv!("shaders/rect.vert", glsl, vert, vulkan1_0);
-
-// static RECT_FRAG_SPIRV: &[u32] = include_spirv!("shaders/rect.frag", glsl, frag, vulkan1_0);
-
-fn create_rectangle_shader() -> (wgpu::ShaderModule, wgpu::ShaderModule) {
-    let vert_descriptor = wgpu::ShaderModuleDescriptor {
-        label: Some("Rectangle Vertex Shader"),
-        //source: ShaderSource::SpirV(Cow::from(RECT_VERT_SPIRV)),
-        source: wgpu::util::make_spirv(RECT_VERT_SPIRV),
-    };
-
-    let frag_descriptor = wgpu::ShaderModuleDescriptor {
-        label: Some("Rectangle Fragment Shader"),
-        //source: ShaderSource::SpirV(Cow::from(RECT_FRAG_SPIRV)),
-        source: wgpu::util::make_spirv(RECT_FRAG_SPIRV),
-    };
-
-    let vert = get_device().create_shader_module(vert_descriptor);
-    let frag = get_device().create_shader_module(frag_descriptor);
-
-    (vert, frag)
-}
-
-static mut RECTANGLE_SHADER: Option<(wgpu::ShaderModule, wgpu::ShaderModule)> = None;
-
-fn get_rectangle_vert_shader() -> &'static (wgpu::ShaderModule, wgpu::ShaderModule) {
-    unsafe { RECTANGLE_SHADER.get_or_insert_with(create_rectangle_shader) }
-}
-
-static mut RECTANGLE_LAYOUT: Option<wgpu::PipelineLayout> = None;
-
-fn create_rectangle_layout() -> wgpu::PipelineLayout {
-    let descriptor = wgpu::PipelineLayoutDescriptor {
-        label: Some("Rectangle Pipeline Layout"),
-        bind_group_layouts: &[get_uniform_binding_layout(), get_uniform_binding_layout()],
-        push_constant_ranges: &[],
-    };
-
-    get_device().create_pipeline_layout(&descriptor)
-}
-
-fn get_rectangle_layout() -> &'static wgpu::PipelineLayout {
-    unsafe { RECTANGLE_LAYOUT.get_or_insert_with(create_rectangle_layout) }
-}
-
-fn create_rectangle_pipeline() -> wgpu::RenderPipeline {
-    let rect_shader = get_rectangle_vert_shader();
-    let descriptor = wgpu::RenderPipelineDescriptor {
-        label: Some("Rectangle Pipeline"),
-        layout: Some(get_rectangle_layout()),
-        vertex: wgpu::VertexState {
-            module: &rect_shader.0,
-            entry_point: "main",
-            buffers: &[],
-        },
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            unclipped_depth: false,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            conservative: false,
-        },
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState {
-            count: 1,
-            mask: !0,
-            alpha_to_coverage_enabled: false,
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &rect_shader.1,
-            entry_point: "main",
-            targets: &[Some(wgpu::ColorTargetState {
-                format: wgpu::TextureFormat::Bgra8UnormSrgb,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        multiview: None,
-    };
-
-    get_device().create_render_pipeline(&descriptor)
-}
-
-static mut RECTANGLE_PIPELINE: Option<wgpu::RenderPipeline> = None;
-
-fn get_rectangle_pipeline() -> &'static wgpu::RenderPipeline {
-    unsafe { RECTANGLE_PIPELINE.get_or_insert_with(create_rectangle_pipeline) }
+lazy_static! {
+    pub(crate) static ref RENDER_INFO_BIND_LAYOUT: wgpu::BindGroupLayout = get_device()
+        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Global Binding Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+    pub(crate) static ref GLOBAL_SAMPLER: wgpu::Sampler =
+        get_device().create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Global Sampler"),
+            address_mode_u: Default::default(),
+            address_mode_v: Default::default(),
+            address_mode_w: Default::default(),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 0.0,
+            compare: None,
+            anisotropy_clamp: 1,
+            border_color: None,
+        });
 }

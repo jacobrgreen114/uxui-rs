@@ -19,10 +19,10 @@ impl InputBuilder {
         self
     }
 
-    pub fn with_binding(mut self, binding: StringPropertyBinding) -> Self {
-        self.text.replace(BindableString::Binding(binding));
-        self
-    }
+    // pub fn with_binding(mut self, binding: StringPropertyBinding) -> Self {
+    //     self.text.replace(BindableString::Binding(binding));
+    //     self
+    // }
 
     pub fn build(self) -> Box<Input> {
         Box::new(Input {
@@ -51,11 +51,11 @@ impl InputHandler for Input {}
 impl PreviewInputHandler for Input {}
 
 impl ComponentController for Input {
-    fn measure(&mut self, available_size: Size) -> Size {
+    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
         todo!()
     }
 
-    fn arrange(&mut self, final_rect: Rect) -> Rect {
+    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
         todo!()
     }
 

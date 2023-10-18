@@ -1,20 +1,18 @@
 use freetype as ft;
 use freetype::ffi::FT_UShort;
+
 use std::cell::{RefCell, UnsafeCell};
 
-use freetype::{Bitmap, RenderMode};
-use gfx::{get_device, get_instance, get_queue, single_submit};
+use gfx::{get_device, get_instance, get_queue};
+use glm::ext::look_at;
 use glm::Vec3;
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::process::Output;
-use std::sync::{Arc, Mutex, RwLock};
-use wgpu::{
-    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, TextureDescriptor, TextureDimension,
-    TextureFormat, COPY_BUFFER_ALIGNMENT,
-};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use wgpu::{ImageCopyTexture, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat};
 
 // #[cfg(target_os = "windows")]
 // const SYSTEM_FONT_PATH: &str = "C:/Windows/Fonts/";
@@ -25,9 +23,9 @@ const SYSTEM_FONT_PATH: &str = "/usr/share/fonts/";
 #[cfg(target_os = "macos")]
 const SYSTEM_FONT_PATH: &str = "/System/Library/Fonts/";
 
-static mut FREETYPE_LIBRARY: Option<ft::Library> = None;
-
 const DPI: u32 = 96;
+
+static mut FREETYPE_LIBRARY: Option<ft::Library> = None;
 
 fn create_freetype_library() -> ft::Library {
     ft::Library::init().unwrap()
@@ -43,7 +41,7 @@ fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<Box<str>, FontFamily>, path: 
     let library = get_freetype_library();
 
     for font_path in std::fs::read_dir(path).unwrap() {
-        let mut face = match font_path {
+        let mut face = match &font_path {
             Ok(entry) => {
                 let file_type = entry.file_type().unwrap();
                 let path = entry.path();
@@ -71,17 +69,13 @@ fn cache_fonts<P: AsRef<Path>>(cache: &mut HashMap<Box<str>, FontFamily>, path: 
         let family = if let Some(family) = cache.get_mut(key.as_str()) {
             family
         } else {
-            cache.insert(
-                key.clone().into(),
-                FontFamily {
-                    name: family_name,
-                    fonts: Vec::new(),
-                },
-            );
+            cache.insert(key.clone().into(), FontFamily::new(family_name.as_str()));
             cache.get_mut(key.as_str()).unwrap()
         };
 
-        family.fonts.push(Font::new(face));
+        family
+            .fonts
+            .push(Font::new(font_path.unwrap().path().as_path(), face));
     }
 }
 
@@ -160,11 +154,12 @@ fn align_size(size: usize, alignment: usize) -> usize {
 #[derive(Debug)]
 pub struct Glyph {
     texture: Option<wgpu::Texture>,
+    texture_view: Option<wgpu::TextureView>,
     metrics: ft::GlyphMetrics,
 }
 
 impl Glyph {
-    fn new(bitmap: &Bitmap, metrics: ft::GlyphMetrics) -> Self {
+    fn new(bitmap: &ft::Bitmap, metrics: ft::GlyphMetrics) -> Self {
         let device = get_device();
 
         let texture = if bitmap.buffer().len() == 0 {
@@ -204,11 +199,26 @@ impl Glyph {
             Some(texture)
         };
 
-        Self { texture, metrics }
+        let texture_view = texture
+            .as_ref()
+            .map(|texture| texture.create_view(&Default::default()));
+
+        Self {
+            texture,
+            texture_view,
+            metrics,
+        }
     }
 
     pub fn advance(&self) -> f32 {
         self.metrics.horiAdvance as f32 / 64.0
+    }
+
+    pub(crate) fn texture(&self) -> Option<&wgpu::Texture> {
+        self.texture.as_ref()
+    }
+    pub(crate) fn texture_view(&self) -> Option<&wgpu::TextureView> {
+        self.texture_view.as_ref()
     }
 }
 
@@ -231,19 +241,24 @@ impl FontStyle {
 
 #[derive(Debug)]
 pub struct Font {
-    face: RwLock<ft::Face>,
+    path: Box<Path>,
+    face: RwLock<Option<ft::Face>>,
     style: FontStyle,
     glyphs: UnsafeCell<HashMap<char, Pin<Box<Glyph>>>>,
+    line_height: f32,
 }
 
 impl Font {
-    pub fn new(mut face: ft::Face) -> Self {
+    pub fn new(path: &Path, mut face: ft::Face) -> Self {
         let os2 = ft::tt_os2::TrueTypeOS2Table::from_face(&mut face).unwrap();
 
         let style = face.style_flags();
 
+        // face.set_char_size(0, 16 * 64, 72, 72).unwrap();
+
         Self {
-            face: RwLock::new(face),
+            path: path.into(),
+            face: RwLock::new(None),
             style: FontStyle {
                 weight: FontWeight::from(os2.us_weight_class()),
                 width: FontWidth::from(os2.us_width_class()),
@@ -254,19 +269,22 @@ impl Font {
                 },
             },
             glyphs: UnsafeCell::new(HashMap::new()),
+            line_height: face.height() as f32 / 64.0,
         }
     }
 
     pub fn line_height(&self) -> f32 {
-        let face = self.face.read().unwrap();
-        face.height() as f32 / 64.0
+        self.line_height
     }
 
     pub fn get_glyph(&self, codepoint: char) -> Result<&Glyph, ()> {
         let glyph = if let Some(glyph) = unsafe { &mut *self.glyphs.get() }.get(&codepoint) {
             glyph
         } else {
-            let face = self.face.write().unwrap();
+            self.load();
+
+            let lock = self.face.write().unwrap();
+            let face = lock.as_ref().unwrap();
 
             // face.set_char_size(0, 16 * 64, DPI, DPI).unwrap();
 
@@ -292,15 +310,46 @@ impl Font {
 
         Ok(glyph.deref())
     }
+
+    fn load(&self) {
+        let mut lock = self.face.write().unwrap();
+        match lock.deref_mut() {
+            Some(_) => return,
+            None => {
+                let mut face = get_freetype_library()
+                    .new_face(self.path.as_ref(), 0)
+                    .unwrap();
+                // face.set_char_size(0, 16 * 64, DPI, DPI).unwrap();
+                *lock.deref_mut() = Some(face);
+            }
+        }
+    }
+
+    fn unload(&self) {
+        let mut lock = self.face.write().unwrap();
+        match lock.deref_mut() {
+            Some(_) => {
+                *lock.deref_mut() = None;
+            }
+            None => return,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct FontFamily {
-    name: String,
+    name: Box<str>,
     fonts: Vec<Font>,
 }
 
 impl FontFamily {
+    fn new(name: &str) -> Self {
+        Self {
+            name: name.into(),
+            fonts: Vec::new(),
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }

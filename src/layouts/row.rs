@@ -10,11 +10,11 @@ impl InputHandler for Row {}
 impl PreviewInputHandler for Row {}
 
 impl ComponentController for Row {
-    fn measure(&mut self, available_size: Size) -> Size {
+    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
         todo!()
     }
 
-    fn arrange(&mut self, final_rect: Rect) -> Rect {
+    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
         todo!()
     }
 

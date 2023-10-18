@@ -136,7 +136,7 @@ impl InputHandler for Column {
 impl PreviewInputHandler for Column {}
 
 impl ComponentController for Column {
-    fn measure(&mut self, available_size: Size) -> Size {
+    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
         let mut remaining_size = available_size;
         let mut max_width = 0.0f32;
 
@@ -150,7 +150,7 @@ impl ComponentController for Column {
         required_size
     }
 
-    fn arrange(&mut self, final_rect: Rect) -> Rect {
+    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
         match self.horiz_align {
             HorizontalAlignment::Left => self.arrange_left(final_rect),
             HorizontalAlignment::Center => self.arrange_center(final_rect),
