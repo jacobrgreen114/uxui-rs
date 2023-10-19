@@ -66,7 +66,7 @@ impl SceneController for LoginSceneController {
                 //     .with_binding(self.model.password.create_binding())
                 //     .build(),
                 Button::builder()
-                    // .with_label("Login")
+                    .with_content(Text::new("Login"))
                     .with_width(Length::Fixed(100.0))
                     .with_height(Length::Fixed(50.0))
                     .with_background(Color::new_rgb(0.0, 1.0, 0.0))
@@ -107,8 +107,8 @@ impl WindowController for ExampleWindowController {
 static LOGIN_WINDOW_CONFIG: WindowConfig = WindowConfig {
     title: Some("Login"),
     size: Some(Size {
-        width: 640.0,
-        height: 480.0,
+        width: 800.0,
+        height: 600.0,
     }),
     pos: None,
     decorations: true,

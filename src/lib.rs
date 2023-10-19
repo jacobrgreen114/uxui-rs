@@ -259,8 +259,8 @@ impl Rect {
     }
 
     pub fn align_center(&self, size: Size) -> Rect {
-        let x = (self.size.width - size.width) / 2.0;
-        let y = (self.size.height - size.height) / 2.0;
+        let x = self.pos.x + (self.size.width - size.width) / 2.0;
+        let y = self.pos.y + (self.size.height - size.height) / 2.0;
         Rect::new(Point::new(x, y), size)
     }
 

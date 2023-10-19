@@ -1,9 +1,12 @@
 # TODO
 
 ### Tasks
+- Tree Structure
+  - [ ] Decide on who owns child components (component or controller)
+
 - Text Rendering
-  - [ ] Implement font size scaling
-  - [ ] Implement glyph drawing
+  - [x] Implement font size scaling
+  - [x] Implement glyph drawing
   - [ ] Implement text clipping
 
 ### Module Level Changes

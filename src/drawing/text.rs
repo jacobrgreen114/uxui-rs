@@ -74,7 +74,7 @@ impl FormattedText {
     pub fn new(text: &str, rect: Rect, font: &'static Font, size: FontSize) -> Self {
         let mut glyphs = Vec::new();
 
-        let font_scale = ::font::calculate_font_scale(size.as_pt());
+        let font_scale = ::font::calculate_font_scale(size);
         let line_height = font.line_height() * font_scale;
         let accent = font.ascent() * font_scale;
         //let decent = font.descent() * font_scale;

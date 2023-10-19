@@ -104,7 +104,7 @@ struct TextFormatter {}
 
 impl TextFormatter {
     fn calculate_bounding_box(text: &str, font: &Font, size: FontSize) -> Size {
-        let font_scale = calculate_font_scale(size.as_pt());
+        let font_scale = calculate_font_scale(size);
 
         let line_height = font.line_height() * font_scale;
 

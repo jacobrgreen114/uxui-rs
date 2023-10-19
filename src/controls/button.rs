@@ -77,9 +77,13 @@ impl ComponentController for Button {
         }
     }
 
+    // todo - fixture out who manages children
     fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
         let _content_rect = match &mut self.content {
-            Some(content) => content.arrange(final_rect),
+            Some(content) => {
+                let child_rect = final_rect.align_center(content.final_size());
+                content.arrange(child_rect)
+            }
             None => Rect::default(),
         };
         self.background.update(final_rect, self.background_color);

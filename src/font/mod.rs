@@ -31,8 +31,8 @@ pub(crate) const PT_PER_EM: f32 = 12.0;
 const RENDER_SIZE_EM: f32 = 8.0;
 const RENDER_SIZE_PT: f32 = RENDER_SIZE_EM * PT_PER_EM;
 
-pub(crate) fn calculate_font_scale(pt: f32) -> f32 {
-    pt / RENDER_SIZE_PT
+pub(crate) fn calculate_font_scale(size: FontSize) -> f32 {
+    size.as_em() / RENDER_SIZE_EM
 }
 
 static mut FREETYPE_LIBRARY: Option<ft::Library> = None;
@@ -227,6 +227,7 @@ impl Glyph {
         let texture = if bitmap.buffer().len() == 0 {
             None
         } else {
+            println!("Glyph {} bytes", bitmap.buffer().len());
             let texture = device.create_texture(&TextureDescriptor {
                 label: Some("Glyph Texture"),
                 size: wgpu::Extent3d {
