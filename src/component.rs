@@ -52,10 +52,15 @@ impl ComponentBuilder {
     //     self
     // }
 
+    #[inline(always)]
     pub fn build(self, controller: impl ComponentController + 'static) -> Component {
+        self.build_boxed(Box::new(controller))
+    }
+
+    fn build_boxed(self, controller: Box<dyn ComponentController + 'static>) -> Component {
         Component {
             sizing: self.sizing,
-            controller: Box::new(controller),
+            controller,
             children: ComponentChildren::None,
             visually_dirty: true,
             layout_dirty: true,
@@ -88,8 +93,8 @@ pub struct Component {
     controller: Box<dyn ComponentController>,
     sizing: Sizing,
     children: ComponentChildren,
-    final_size: Size,
-    final_rect: Rect,
+    final_size: Option<Size>,
+    final_rect: Option<Rect>,
     visually_dirty: bool,
     layout_dirty: bool,
     visibility: Visibility,
@@ -105,11 +110,11 @@ impl Component {
     }
 
     pub fn final_size(&self) -> Size {
-        self.final_size
+        self.final_size.unwrap()
     }
 
     pub fn final_rect(&self) -> Rect {
-        self.final_rect
+        self.final_rect.unwrap()
     }
 
     pub fn measure(&mut self, available_size: Size) -> Size {
@@ -119,7 +124,7 @@ impl Component {
                 let available = self.sizing.calc_available_size(available_size);
                 let required = self.controller.measure(available, self.children.as_slice());
                 let final_size = self.sizing.calc_final_size(available, required);
-                self.final_size = final_size;
+                self.final_size = Some(final_size);
                 final_size
             }
         }
@@ -129,17 +134,18 @@ impl Component {
         match self.visibility {
             Visibility::Collapsed => Rect::new(final_rect.pos, Size::zero()),
             _ => {
-                self.final_rect = self
+                let final_rect = self
                     .controller
                     .arrange(final_rect, self.children.as_slice());
+                self.final_rect = Some(final_rect);
                 self.visually_dirty = false;
-                self.final_rect
+                final_rect
             }
         }
     }
 
     pub fn arrange_from(&mut self, point: Point) -> Rect {
-        self.arrange(Rect::new(point, self.final_size))
+        self.arrange(Rect::new(point, self.final_size.unwrap()))
     }
 
     pub fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
@@ -177,7 +183,11 @@ impl InputHandler for Component {
     }
 }
 
-trait ComponentSizingExt {
+/*
+   Sizing Extensions
+*/
+
+pub(crate) trait ComponentSizingExt {
     fn calc_available_size(&self, available_size: Size) -> Size;
     fn calc_final_size(&self, available_size: Size, required_size: Size) -> Size;
 }

@@ -1,5 +1,6 @@
 extern crate freetype;
 extern crate glm;
+extern crate image;
 extern crate lazy_static;
 extern crate num_traits;
 extern crate wgpu;
@@ -18,6 +19,8 @@ mod scene;
 mod ui;
 mod util;
 mod window;
+
+mod component_v2;
 
 pub use self::application::*;
 // pub use self::component::*;
@@ -351,7 +354,7 @@ impl Default for Length {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Dimension {
     pub desired: Length,
     pub min: f32,
@@ -368,7 +371,7 @@ impl Default for Dimension {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Sizing {
     pub width: Dimension,
     pub height: Dimension,
@@ -405,4 +408,16 @@ pub enum VerticalAlignment {
 pub struct Alignment {
     pub horizontal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
+}
+
+/**
+ * Initializes the UXUI library in a multithreaded manner.
+ * If this function is not called, the library will be initialized using lazy statics.
+ */
+pub fn initialize() {
+    let t = std::thread::spawn(|| {
+        font::initialize();
+    });
+    gfx::initialize();
+    t.join().unwrap();
 }

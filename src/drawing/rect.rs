@@ -11,12 +11,12 @@ struct RectangleUniform {
 }
 
 #[allow(dead_code)]
-pub struct Rectangle {
+pub struct VisualRectangle {
     buffer: UniformBuffer<RectangleUniform>,
     bind_group: wgpu::BindGroup,
 }
 
-impl Rectangle {
+impl VisualRectangle {
     pub fn new(rect: Rect, color: ::Color) -> Self {
         let device = get_device();
 
@@ -45,7 +45,7 @@ impl Rectangle {
     }
 }
 
-impl Drawable for Rectangle {
+impl Visual for VisualRectangle {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&RECT_PIPELINE);
         render_pass.set_bind_group(1, &self.bind_group, &[]);

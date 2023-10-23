@@ -141,6 +141,11 @@ impl ComponentController for Column {
         let mut max_width = 0.0f32;
 
         for child in &mut self.children {
+            // debug_assert!(
+            //     remaining_size.height >= 0.0,
+            //     "No remaining size available for children"
+            // );
+
             let child_size = child.measure(remaining_size);
             remaining_size.height -= child_size.height;
             max_width = max_width.max(child_size.width);

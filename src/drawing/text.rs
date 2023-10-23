@@ -1,7 +1,7 @@
 use super::*;
 use crate::font::Font;
 use crate::gfx::*;
-use drawing::{Drawable, UniformBuffer};
+use drawing::{UniformBuffer, Visual};
 use font::FontSize;
 use freetype::glyph;
 use glm::{Mat4, Vec4};
@@ -16,12 +16,12 @@ struct GlyphUniform {
     color: Color,
 }
 
-struct Glyph {
+struct VisualGlyph {
     buffer: UniformBuffer<GlyphUniform>,
     bind_group: wgpu::BindGroup,
 }
 
-impl Glyph {
+impl VisualGlyph {
     fn new(rect: Rect, texture_view: &wgpu::TextureView) -> Self {
         let device = get_device();
         let buffer = UniformBuffer::new_initialized(GlyphUniform {
@@ -52,7 +52,7 @@ impl Glyph {
     }
 }
 
-impl Drawable for Glyph {
+impl Visual for VisualGlyph {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         // note: pipeline bound by FormattedText
         // render_pass.set_pipeline(get_glyph_pipeline());
@@ -61,15 +61,15 @@ impl Drawable for Glyph {
     }
 }
 
-pub struct FormattedText {
+pub struct VisualText {
     text: Box<str>,
     font: &'static Font,
     size: ::font::FontSize,
     rect: Rect,
-    glyphs: Vec<Glyph>,
+    glyphs: Vec<VisualGlyph>,
 }
 
-impl FormattedText {
+impl VisualText {
     // todo: implement text alignment
     pub fn new(text: &str, rect: Rect, font: &'static Font, size: FontSize) -> Self {
         let mut glyphs = Vec::new();
@@ -103,7 +103,7 @@ impl FormattedText {
                     let mut rect = Rect::new(p, s);
                     rect.pos.y = rect.pos.y + line_height;
 
-                    glyphs.push(Glyph::new(rect, texture_view));
+                    glyphs.push(VisualGlyph::new(rect, texture_view));
                 }
                 pos.x += glyph.advance() * font_scale;
             }
@@ -129,7 +129,7 @@ impl FormattedText {
     }
 }
 
-impl Drawable for FormattedText {
+impl Visual for VisualText {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&GLYPH_RENDER_PIPELINE);
         for glyph in &self.glyphs {

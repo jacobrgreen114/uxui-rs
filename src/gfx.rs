@@ -56,3 +56,7 @@ pub(crate) fn get_queue() -> &'static Queue {
 //     f(&mut encoder);
 //     queue.submit(Some(encoder.finish()));
 // }
+
+pub(crate) fn initialize() {
+    lazy_static::initialize(&DEVICE_QUEUE);
+}

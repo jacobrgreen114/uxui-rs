@@ -31,7 +31,7 @@ pub struct Text {
     text: BindableString,
     font_info: FontInfo,
     cached_bb: Size,
-    formatted_text: Option<FormattedText>,
+    formatted_text: Option<VisualText>,
 }
 
 impl Text {
@@ -86,7 +86,7 @@ impl ComponentController for Text {
         })
         .unwrap();
 
-        self.formatted_text = Some(FormattedText::new(
+        self.formatted_text = Some(VisualText::new(
             text,
             final_rect,
             font,

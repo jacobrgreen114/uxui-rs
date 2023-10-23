@@ -13,6 +13,8 @@ use uxui::controls::*;
 use uxui::layouts::*;
 use uxui::*;
 
+const UXUI_LOGO_IMG: &[u8] = include_bytes!("../assets/uxui_logo.png");
+
 lazy_static! {
     static ref START_TIME: Instant = Instant::now();
 }
@@ -57,6 +59,7 @@ impl SceneController for LoginSceneController {
             .with_horizontal_alignment(HorizontalAlignment::Center)
             .with_children(vec![
                 Text::new("Hello, world!"),
+                // Image::from_bytes(UXUI_LOGO_IMG),
                 // Input::builder()
                 //     .with_hint("Username")
                 //     .with_binding(self.model.username.create_binding())
@@ -134,5 +137,7 @@ impl ApplicationController for ExampleAppController {
 
 fn main() {
     lazy_static::initialize(&START_TIME);
+    // optional
+    uxui::initialize();
     Application::run::<ExampleAppController>()
 }

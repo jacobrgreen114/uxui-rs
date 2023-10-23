@@ -1,9 +1,10 @@
+mod image;
 mod rect;
 mod text;
 
+pub use self::image::*;
 pub use self::rect::*;
 pub use self::text::*;
-use std::borrow::Cow;
 
 use crate::gfx::*;
 
@@ -20,7 +21,7 @@ use Rect;
 
 use lazy_static::lazy_static;
 
-pub trait Drawable {
+pub trait Visual {
     fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>);
 }
 
@@ -36,7 +37,7 @@ impl<'a> DrawingContext<'a> {
     #[inline]
     pub fn draw<D>(&mut self, drawable: &'a D)
     where
-        D: Drawable,
+        D: Visual,
     {
         drawable.draw(&mut self.render_pass)
     }

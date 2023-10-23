@@ -1,18 +1,17 @@
 use freetype::ffi::{FT_Size_Metrics, FT_UShort};
 use {freetype as ft, Size};
 
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::*;
 
-use gfx::{get_device, get_instance, get_queue};
-use glm::ext::look_at;
-use glm::Vec3;
-use lazy_static::lazy_static;
+use gfx::*;
+use wgpu;
+
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
-use wgpu::{ImageCopyTexture, ImageDataLayout, TextureDescriptor, TextureDimension, TextureFormat};
+use std::sync::*;
+use lazy_static::lazy_static;
 use Point;
 
 // #[cfg(target_os = "windows")]
@@ -227,8 +226,7 @@ impl Glyph {
         let texture = if bitmap.buffer().len() == 0 {
             None
         } else {
-            println!("Glyph {} bytes", bitmap.buffer().len());
-            let texture = device.create_texture(&TextureDescriptor {
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("Glyph Texture"),
                 size: wgpu::Extent3d {
                     width: bitmap.width() as u32,
@@ -237,21 +235,21 @@ impl Glyph {
                 },
                 mip_level_count: 1,
                 sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::R8Unorm,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::R8Unorm,
                 usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[TextureFormat::R8Unorm],
+                view_formats: &[wgpu::TextureFormat::R8Unorm],
             });
 
             get_queue().write_texture(
-                ImageCopyTexture {
+                wgpu::ImageCopyTexture {
                     texture: &texture,
                     mip_level: 0,
                     origin: Default::default(),
                     aspect: Default::default(),
                 },
                 bitmap.buffer(),
-                ImageDataLayout {
+                wgpu::ImageDataLayout {
                     offset: 0,
                     bytes_per_row: Some(bitmap.pitch() as u32),
                     rows_per_image: Some(bitmap.rows() as u32),
@@ -580,4 +578,9 @@ impl From<FT_UShort> for FontWidth {
             9.. => FontWidth::UltraExpanded,
         }
     }
+}
+
+
+pub(crate) fn initialize() {
+    get_font_cache();
 }

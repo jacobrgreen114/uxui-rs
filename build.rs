@@ -5,6 +5,8 @@ use std::process::Command;
 const SHADERS: &[&str] = &[
     "shaders/rect.vert",
     "shaders/rect.frag",
+    "shaders/image.vert",
+    "shaders/image.frag",
     "shaders/glyph_sdf.vert",
     "shaders/glyph_sdf.frag",
 ];

@@ -44,7 +44,7 @@ impl ButtonBuilder {
         self.builder.build(Button {
             content: self.content,
             background_color,
-            background: Rectangle::new(Rect::default(), background_color),
+            background: VisualRectangle::new(Rect::default(), background_color),
         })
     }
 }
@@ -52,7 +52,7 @@ impl ButtonBuilder {
 pub struct Button {
     content: Option<Component>,
     background_color: Color,
-    background: Rectangle,
+    background: VisualRectangle,
 }
 
 impl Button {
