@@ -10,12 +10,13 @@ use {wgpu, Color};
 use {Point, Size};
 
 #[repr(packed)]
-#[allow(dead_code)]
+#[derive(Debug)]
 struct GlyphUniform {
     transform: Mat4,
     color: Color,
 }
 
+#[derive(Debug)]
 struct VisualGlyph {
     buffer: UniformBuffer<GlyphUniform>,
     bind_group: wgpu::BindGroup,
@@ -61,6 +62,7 @@ impl Visual for VisualGlyph {
     }
 }
 
+#[derive(Debug)]
 pub struct VisualText {
     text: Box<str>,
     font: &'static Font,

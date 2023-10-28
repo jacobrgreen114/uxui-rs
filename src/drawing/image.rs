@@ -2,10 +2,12 @@ use super::*;
 
 use lazy_static::lazy_static;
 
+#[derive(Debug)]
 struct ImageUniform {
     transform: Mat4,
 }
 
+#[derive(Debug)]
 pub struct VisualImage {
     uniform: UniformBuffer<ImageUniform>,
     bind_group: wgpu::BindGroup,

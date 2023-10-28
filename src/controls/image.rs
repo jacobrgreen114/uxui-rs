@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::convert::TryFrom;
 use std::ops::Deref;
 use {image, Size};
@@ -55,6 +56,7 @@ impl Builder<Image> for ImageBuilder<'_> {
             texture,
             view,
             visual: None,
+            final_size: Cell::new(Size::zero()),
         }
     }
 }
@@ -63,11 +65,13 @@ impl Builder<Image> for ImageBuilder<'_> {
    Image
 */
 
+#[derive(Debug)]
 pub struct Image {
     sizing: Sizing,
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     visual: Option<VisualImage>,
+    final_size: Cell<Size>,
 }
 
 impl Image {
@@ -90,10 +94,13 @@ impl Layout for Image {
     fn measure(&mut self, available_size: Size) -> Size {
         let available = self.sizing.calc_available_size(available_size);
         // let required = Size::new(self.texture.width() as f32, self.texture.height() as f32);
-        self.sizing.calc_final_size(available, available)
+        let final_size = self.sizing.calc_final_size(available, available);
+        self.final_size.set(final_size);
+        final_size
     }
 
     fn arrange(&mut self, final_rect: Rect) -> Rect {
+        let final_rect = final_rect.align_center(self.final_size.get());
         self.visual = Some(VisualImage::new(final_rect, &self.view));
         final_rect
     }

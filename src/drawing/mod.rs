@@ -102,6 +102,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct Buffer<T> {
     buffer: wgpu::Buffer,
     phantom: std::marker::PhantomData<T>,
@@ -164,6 +165,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct UniformBuffer<T>
 where
     T: Sized,

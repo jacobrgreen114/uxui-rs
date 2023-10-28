@@ -1,9 +1,16 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::fmt::{Debug, Formatter};
+
 use std::sync::{Arc, RwLock};
 
 pub struct Delegate<Ret, Args> {
     func: Arc<RefCell<dyn FnMut(Args) -> Ret>>,
+}
+
+impl<Ret, Args> Debug for Delegate<Ret, Args> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Delegate").finish()
+    }
 }
 
 impl<Ret, Args> PartialEq<Self> for Delegate<Ret, Args> {
@@ -34,7 +41,7 @@ impl<Ret, Args> Delegate<Ret, Args> {
 
 type Action<T> = Delegate<(), T>;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Event<Args>
 where
     Args: Clone,
@@ -60,6 +67,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct PropertyInternal<T>
 where
     T: Clone,
@@ -85,6 +93,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct Property<T>
 where
     T: Clone,
@@ -126,6 +135,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct PropertyBinding<T>
 where
     T: Clone,
@@ -146,6 +156,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum Bindable<T: Clone> {
     Unbound(T),
     Bound(PropertyBinding<T>),

@@ -44,11 +44,13 @@ impl Builder<Button> for ButtonBuilder {
     }
 }
 
+#[derive(Debug)]
 struct ButtonContent {
     content: Box<dyn Component>,
     final_size: Cell<Size>,
 }
 
+#[derive(Debug)]
 pub struct Button {
     content: Option<ButtonContent>,
     sizing: Sizing,
@@ -107,6 +109,9 @@ impl PreviewInputHandler for Button {}
 
 impl InputHandler for Button {
     fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
+        println!("Button cursor moved: {:?}", event);
+        false
+    }
 }
 
 impl DispatchInput for Button {

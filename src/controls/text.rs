@@ -43,6 +43,7 @@ impl Builder<Text> for TextBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct Text {
     text: BindableString,
     font_info: FontInfo,

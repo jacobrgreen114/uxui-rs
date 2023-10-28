@@ -1,4 +1,5 @@
-#![windows_subsystem = "windows"]
+// Enable this to build a windows desktop app without a console window
+// #![windows_subsystem = "windows"]
 
 extern crate lazy_static;
 extern crate uxui;
@@ -52,7 +53,7 @@ impl SceneController for LoginSceneController {
     fn on_init(&mut self, scene: &Scene) {
         let model = self.model.clone();
 
-        let root = Column::builder()
+        let center = Column::builder()
             .with_sizing(Sizing::fill())
             .with_alignment(HorizontalAlignment::Center)
             .with_children(vec![
@@ -82,6 +83,15 @@ impl SceneController for LoginSceneController {
                 //     .with_background(Color::new_rgb(0.0, 1.0, 1.0))
                 //     .build_boxed(),
             ])
+            .build_boxed();
+
+        let root = Dock::builder()
+            .with_sizing(Sizing::fill())
+            .with_center(center)
+            .with_top(Text::builder("Top").build_boxed())
+            .with_bottom(Text::builder("Bottom").build_boxed())
+            .with_left(Text::builder("Left").build_boxed())
+            .with_right(Text::builder("Right").build_boxed())
             .build_boxed();
 
         scene.swap_root(Some(root));

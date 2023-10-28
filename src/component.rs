@@ -1,9 +1,14 @@
 use crate::*;
 use drawing::*;
 use input_handling::*;
-use std::cell::Cell;
 
-pub trait Component: Layout + Draw + PreviewInputHandler + InputHandler + DispatchInput {}
+use std::cell::Cell;
+use std::fmt::Debug;
+
+pub trait Component:
+    Layout + Draw + PreviewInputHandler + InputHandler + DispatchInput + Debug
+{
+}
 
 // pub trait ComponentController: Layout + Draw + InputHandler {}
 

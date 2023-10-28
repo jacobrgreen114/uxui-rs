@@ -4,13 +4,13 @@ use crate::*;
 use std::convert::TryInto;
 
 #[repr(packed)]
-#[allow(dead_code)]
+#[derive(Debug)]
 struct RectangleUniform {
     transform: Mat4,
     color: Vec4,
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub struct VisualRectangle {
     buffer: UniformBuffer<RectangleUniform>,
     bind_group: wgpu::BindGroup,

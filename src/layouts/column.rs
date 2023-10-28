@@ -4,11 +4,13 @@ use crate::*;
 use input_handling::*;
 use std::cell::Cell;
 
+#[derive(Debug)]
 struct ColumnChild {
     component: Box<dyn Component>,
     final_size: Cell<Size>,
 }
 
+#[derive(Debug)]
 pub struct Column {
     children: Vec<ColumnChild>,
     sizing: Sizing,

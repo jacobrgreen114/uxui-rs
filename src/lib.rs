@@ -7,7 +7,7 @@ extern crate wgpu;
 extern crate winit;
 
 mod application;
-mod binding;
+// mod binding;
 mod component;
 pub mod controls;
 mod drawing;
@@ -22,7 +22,7 @@ mod util;
 mod window;
 
 pub use self::application::*;
-pub use self::binding::*;
+// pub use self::binding::*;
 pub use self::scene::*;
 pub use self::window::*;
 
@@ -429,6 +429,7 @@ impl Sizing {
     }
 }
 
+#[derive(Debug)]
 pub enum BindableString {
     Static(String),
     // Binding(StringPropertyBinding),
