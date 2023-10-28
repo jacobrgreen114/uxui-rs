@@ -30,7 +30,7 @@ pub trait SceneController {
 
 pub struct Scene {
     controller: RefCell<Box<dyn SceneController>>,
-    root: UnsafeCell<Option<Component>>,
+    root: UnsafeCell<Option<Box<dyn Component>>>,
     background_color: Color,
     layout_dirty: bool,
 }
@@ -47,7 +47,7 @@ impl Scene {
         this
     }
 
-    pub fn swap_root(&self, new: Option<Component>) -> Option<Component> {
+    pub fn swap_root(&self, new: Option<Box<dyn Component>>) -> Option<Box<dyn Component>> {
         let mut r = unsafe { &mut *self.root.get() };
         let old = r.take();
         *r.deref_mut() = new;
@@ -60,10 +60,10 @@ impl Scene {
 
     pub(crate) fn update_layout(&mut self, canvas_size: Size) {
         if let Some(root) = unsafe { &mut *self.root.get() } {
-            if self.layout_dirty || root.is_layout_dirty() {
-                let measured_size = root.measure(canvas_size);
-                root.arrange(Rect::new(Point::zero(), canvas_size).align_center(measured_size));
-            }
+            // if self.layout_dirty || root.is_layout_dirty() {
+            let measured_size = root.measure(canvas_size);
+            root.arrange(Rect::new(Point::zero(), canvas_size).align_center(measured_size));
+            //}
         }
         self.layout_dirty = false;
     }
@@ -90,28 +90,28 @@ impl Scene {
 impl InputHandler for Scene {
     fn on_key(&mut self, event: &KeyEvent) -> bool {
         match unsafe { &mut *self.root.get() } {
-            Some(root) => root.on_key(event),
+            Some(root) => root.dispatch_key(event),
             None => false,
         }
     }
 
     fn on_mouse_button(&mut self, event: &MouseButtonEvent) -> bool {
         match unsafe { &mut *self.root.get() } {
-            Some(root) => root.on_mouse_button(event),
+            Some(root) => root.dispatch_mouse_button(event),
             None => false,
         }
     }
 
     fn on_mouse_wheel(&mut self, event: &MouseWheelEvent) -> bool {
         match unsafe { &mut *self.root.get() } {
-            Some(root) => root.on_mouse_wheel(event),
+            Some(root) => root.dispatch_mouse_wheel(event),
             None => false,
         }
     }
 
     fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
         match unsafe { &mut *self.root.get() } {
-            Some(root) => root.on_cursor_moved(event),
+            Some(root) => root.dispatch_cursor_moved(event),
             None => false,
         }
     }

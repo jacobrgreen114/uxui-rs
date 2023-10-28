@@ -8,7 +8,7 @@ layout(location = 0) in vec2 in_uv;
 
 layout(location = 0) out vec4 out_color;
 
-const float SHARPNESS = 1.5;
+const float SHARPNESS = 2.71;
 
 void main() {
     const float dist = texture(sampler2D(glyph_texture, default_sampler), in_uv).r;

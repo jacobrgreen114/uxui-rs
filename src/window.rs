@@ -303,8 +303,8 @@ impl Window {
             });
 
             render_pass.set_bind_group(0, &bind_group, &[]);
-
-            let mut drawing_context = DrawingContext::new(render_pass);
+            let mut drawing_context =
+                DrawingContext::new(render_pass, Rect::new(Point::new(0.0, 0.0), size.into()));
 
             if let Some(scene) = scene.as_ref() {
                 scene.draw(&mut drawing_context);

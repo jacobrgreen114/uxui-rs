@@ -3,7 +3,6 @@
 extern crate lazy_static;
 extern crate uxui;
 
-use std::ops::Deref;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -53,13 +52,14 @@ impl SceneController for LoginSceneController {
     fn on_init(&mut self, scene: &Scene) {
         let model = self.model.clone();
 
-        let root = Column::build()
-            .with_width(Length::Fill)
-            .with_height(Length::Fill)
-            .with_horizontal_alignment(HorizontalAlignment::Center)
+        let root = Column::builder()
+            .with_sizing(Sizing::fill())
+            .with_alignment(HorizontalAlignment::Center)
             .with_children(vec![
-                Text::new("Hello, world!"),
-                // Image::from_bytes(UXUI_LOGO_IMG),
+                Text::builder("Hello, World!\nWelcome to UXUI!").build_boxed(),
+                Image::from_bytes(UXUI_LOGO_IMG)
+                    .with_sizing(Sizing::fixed(Size::new(64.0, 64.0)))
+                    .build_boxed(),
                 // Input::builder()
                 //     .with_hint("Username")
                 //     .with_binding(self.model.username.create_binding())
@@ -69,22 +69,20 @@ impl SceneController for LoginSceneController {
                 //     .with_binding(self.model.password.create_binding())
                 //     .build(),
                 Button::builder()
-                    .with_content(Text::new("Login"))
-                    .with_width(Length::Fixed(100.0))
-                    .with_height(Length::Fixed(50.0))
+                    //.with_content(Text::new("Login"))
+                    .with_sizing(Sizing::fixed(Size::new(100.0, 50.0)))
                     .with_background(Color::new_rgb(0.0, 1.0, 0.0))
-                    .with_action(Box::new(move || {
-                        model.on_login();
-                    }))
-                    .build(),
-                Button::builder()
-                    // .with_label("Login2")
-                    .with_width(Length::Fixed(500.0))
-                    .with_height(Length::Fixed(50.0))
-                    .with_background(Color::new_rgb(0.0, 1.0, 1.0))
-                    .build(),
+                    //.with_action(Box::new(move || {
+                    //    model.on_login();
+                    //}))
+                    .build_boxed(),
+                // Button::builder()
+                //     // .with_label("Login2")
+                //     .with_sizing(Sizing::fixed(Size::new(500.0, 50.0)))
+                //     .with_background(Color::new_rgb(0.0, 1.0, 1.0))
+                //     .build_boxed(),
             ])
-            .build();
+            .build_boxed();
 
         scene.swap_root(Some(root));
     }

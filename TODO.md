@@ -3,6 +3,7 @@
 ### Tasks
 - Framework
   - [ ] Finalize 'Component' structure
+  - [ ] Experiment with extension traits for `Component`
 
 
 - Graphics
@@ -13,6 +14,7 @@
   - [x] Implement font size scaling
   - [x] Implement glyph drawing
   - [ ] Implement text clipping
+  - [ ] Improve glyph rendering quality
 
 
 ### Module Level Changes

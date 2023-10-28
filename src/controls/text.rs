@@ -1,7 +1,8 @@
 use crate::component::*;
 use crate::drawing::*;
 use crate::*;
-use input_handling::{InputHandler, PreviewInputHandler};
+use input_handling::*;
+use std::cell::Cell;
 
 use crate::font::*;
 
@@ -27,29 +28,72 @@ impl Default for FontInfo {
     }
 }
 
+pub struct TextBuilder {
+    text: BindableString,
+    font_info: FontInfo,
+}
+
+impl Builder<Text> for TextBuilder {
+    fn build(self) -> Text {
+        Text {
+            text: self.text,
+            font_info: self.font_info,
+            formatted_text: None,
+        }
+    }
+}
+
 pub struct Text {
     text: BindableString,
     font_info: FontInfo,
-    cached_bb: Size,
     formatted_text: Option<VisualText>,
 }
 
 impl Text {
-    pub fn new(text: &str) -> Component {
-        let font_info = FontInfo::default();
+    pub fn builder(text: &str) -> TextBuilder {
+        TextBuilder {
+            text: BindableString::Static(text.into()),
+            font_info: Default::default(),
+        }
+    }
+}
 
+impl Layout for Text {
+    fn measure(&mut self, available_size: Size) -> Size {
         let font = find_best_font(&BestFontQuery {
-            query: FontQuery::FamilyName(font_info.family.as_ref()),
+            query: FontQuery::FamilyName(self.font_info.family.as_ref()),
             style: Default::default(),
         })
         .unwrap();
 
-        ComponentBuilder::default().build(Text {
-            text: BindableString::Static(text.into()),
-            font_info,
-            cached_bb: Size::default(),
-            formatted_text: None,
+        let text = match &self.text {
+            BindableString::Static(text) => text.as_str(),
+            // BindableString::Binding(binding) => todo!(),
+        };
+
+        TextFormatter::calculate_bounding_box(text, font, self.font_info.size)
+    }
+
+    fn arrange(&mut self, final_rect: Rect) -> Rect {
+        let text = match &self.text {
+            BindableString::Static(text) => text.as_str(),
+            // BindableString::Binding(binding) => todo!(),
+        };
+
+        let font = find_best_font(&BestFontQuery {
+            query: FontQuery::FamilyName(self.font_info.family.as_ref()),
+            style: Default::default(),
         })
+        .unwrap();
+
+        self.formatted_text = Some(VisualText::new(text, final_rect, font, self.font_info.size));
+        final_rect
+    }
+}
+
+impl Draw for Text {
+    fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
+        context.draw(self.formatted_text.as_ref().unwrap());
     }
 }
 
@@ -57,48 +101,9 @@ impl InputHandler for Text {}
 
 impl PreviewInputHandler for Text {}
 
-impl ComponentController for Text {
-    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
-        let font = find_best_font(&BestFontQuery {
-            query: FontQuery::FamilyName(self.font_info.family.as_ref()),
-            style: Default::default(),
-        })
-        .unwrap();
+impl DispatchInput for Text {}
 
-        let text = match &self.text {
-            BindableString::Static(text) => text.as_str(),
-            // BindableString::Binding(binding) => todo!(),
-        };
-
-        self.cached_bb = TextFormatter::calculate_bounding_box(text, font, self.font_info.size);
-        self.cached_bb
-    }
-
-    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
-        let text = match &self.text {
-            BindableString::Static(text) => text.as_str(),
-            // BindableString::Binding(binding) => todo!(),
-        };
-
-        let font = find_best_font(&BestFontQuery {
-            query: FontQuery::FamilyName(self.font_info.family.as_ref()),
-            style: Default::default(),
-        })
-        .unwrap();
-
-        self.formatted_text = Some(VisualText::new(
-            text,
-            final_rect,
-            font,
-            self.font_info.size,
-        ));
-        final_rect
-    }
-
-    fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
-        context.draw(self.formatted_text.as_ref().unwrap());
-    }
-}
+impl Component for Text {}
 
 struct TextFormatter {}
 

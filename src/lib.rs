@@ -15,23 +15,21 @@ pub mod font;
 mod gfx;
 pub mod input_handling;
 pub mod layouts;
+mod observable;
 mod scene;
 mod ui;
 mod util;
 mod window;
 
-mod component_v2;
-
 pub use self::application::*;
-// pub use self::component::*;
 pub use self::binding::*;
 pub use self::scene::*;
 pub use self::window::*;
 
-use glm::Vec4;
-
 use std::ops::*;
 use std::sync::Arc;
+
+use glm::Vec4;
 use winit::dpi::PhysicalPosition;
 
 pub use num_traits::*;
@@ -73,6 +71,8 @@ pub struct Size {
 }
 
 impl Size {
+    pub const MIN: Self = Self::new(f32::MIN, f32::MIN);
+
     pub const fn new(width: f32, height: f32) -> Self {
         Self { width, height }
     }
@@ -162,6 +162,10 @@ pub struct Point {
 impl Point {
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
+    }
+
+    pub fn relative_to(&self, other: Point) -> Self {
+        Self::new(self.x - other.x, self.y - other.y)
     }
 }
 
@@ -361,20 +365,68 @@ pub struct Dimension {
     pub max: f32,
 }
 
-impl Default for Dimension {
-    fn default() -> Self {
-        Self {
-            desired: Length::default(),
-            min: f32::MIN,
-            max: f32::MAX,
-        }
+impl Dimension {
+    pub const fn new(desired: Length, min: f32, max: f32) -> Self {
+        Self { desired, min, max }
+    }
+
+    pub const fn fit() -> Self {
+        Self::new(Length::Fit, f32::MIN, f32::MAX)
+    }
+
+    pub const fn fill() -> Self {
+        Self::new(Length::Fill, f32::MIN, f32::MAX)
+    }
+
+    pub const fn fixed(pixels: f32) -> Self {
+        Self::new(Length::Fixed(pixels), pixels, pixels)
+    }
+
+    pub const fn default() -> Self {
+        Self::fill()
     }
 }
 
+impl Default for Dimension {
+    fn default() -> Self {
+        Self::default()
+    }
+}
+
+// todo : consider implenting aspect ratio locking sizing mode (ex. images)
 #[derive(Debug, Default, Copy, Clone)]
 pub struct Sizing {
     pub width: Dimension,
     pub height: Dimension,
+}
+
+impl Sizing {
+    pub const fn new(width: Dimension, height: Dimension) -> Self {
+        Self { width, height }
+    }
+
+    pub const fn fit() -> Self {
+        Self::new(Dimension::fit(), Dimension::fit())
+    }
+
+    pub const fn fill() -> Self {
+        Self::new(Dimension::fill(), Dimension::fill())
+    }
+
+    pub const fn fit_min_max(min: Size, max: Size) -> Self {
+        Self {
+            width: Dimension::new(Length::Fit, min.width, max.width),
+            height: Dimension::new(Length::Fit, min.height, max.height),
+        }
+    }
+
+    pub const fn fixed(size: Size) -> Self {
+        Self::new(Dimension::fixed(size.width), Dimension::fixed(size.height))
+    }
+
+    pub const fn default() -> Self {
+        Self::fit()
+    }
 }
 
 pub enum BindableString {
@@ -396,6 +448,12 @@ pub enum HorizontalAlignment {
     Right,
 }
 
+impl Default for HorizontalAlignment {
+    fn default() -> Self {
+        HorizontalAlignment::Left
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum VerticalAlignment {
@@ -404,10 +462,23 @@ pub enum VerticalAlignment {
     Bottom,
 }
 
+impl Default for VerticalAlignment {
+    fn default() -> Self {
+        VerticalAlignment::Top
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Alignment {
     pub horizontal: HorizontalAlignment,
     pub vertical: VerticalAlignment,
+}
+
+pub trait Builder<T: component::Component>: Sized {
+    fn build(self) -> T;
+    fn build_boxed(self) -> Box<T> {
+        Box::new(self.build())
+    }
 }
 
 /**

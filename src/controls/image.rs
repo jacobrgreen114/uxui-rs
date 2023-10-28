@@ -4,63 +4,114 @@ use {image, Size};
 
 use component::*;
 use drawing::{DrawingContext, VisualImage};
-use input_handling::{InputHandler, PreviewInputHandler};
-use Rect;
+use input_handling::*;
+use {Rect, Sizing};
 
 use gfx::{get_device, get_queue};
 use image::EncodableLayout;
+use num_traits::Zero;
 use std::path::Path;
 use wgpu::Extent3d;
+use Builder;
+
+/*
+   Image Builder
+*/
+
+enum ImageSource<'a> {
+    File(&'a Path),
+    Bytes(&'a [u8]),
+}
+
+impl Into<image::DynamicImage> for ImageSource<'_> {
+    fn into(self) -> image::DynamicImage {
+        match self {
+            ImageSource::File(path) => image::open(path).unwrap(),
+            ImageSource::Bytes(bytes) => image::load_from_memory(bytes).unwrap(),
+        }
+    }
+}
+
+pub struct ImageBuilder<'a> {
+    source: ImageSource<'a>,
+    sizing: Sizing,
+}
+
+impl ImageBuilder<'_> {
+    pub fn with_sizing(mut self, sizing: Sizing) -> Self {
+        self.sizing = sizing;
+        self
+    }
+}
+
+impl Builder<Image> for ImageBuilder<'_> {
+    fn build(self) -> Image {
+        let image = self.source.into();
+        let texture = create_texture_from_image(image);
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        Image {
+            sizing: self.sizing,
+            texture,
+            view,
+            visual: None,
+        }
+    }
+}
 
 /*
    Image
 */
 
 pub struct Image {
+    sizing: Sizing,
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     visual: Option<VisualImage>,
 }
 
 impl Image {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Component {
-        Self::from_image(image::open(path).unwrap())
+    pub fn from_file(path: &Path) -> ImageBuilder {
+        ImageBuilder {
+            source: ImageSource::File(path.as_ref()),
+            sizing: Sizing::default(),
+        }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Component {
-        Self::from_image(image::load_from_memory(bytes).unwrap())
-    }
-
-    fn from_image(image: image::DynamicImage) -> Component {
-        let texture = create_texture_from_image(image);
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        ComponentBuilder::default().build(Image {
-            texture,
-            view,
-            visual: None,
-        })
+    pub fn from_bytes(bytes: &[u8]) -> ImageBuilder {
+        ImageBuilder {
+            source: ImageSource::Bytes(bytes),
+            sizing: Sizing::default(),
+        }
     }
 }
 
-impl PreviewInputHandler for Image {}
-
-impl InputHandler for Image {}
-
-impl ComponentController for Image {
-    fn measure(&mut self, available_size: Size, children: &[Component]) -> Size {
-        available_size
+impl Layout for Image {
+    fn measure(&mut self, available_size: Size) -> Size {
+        let available = self.sizing.calc_available_size(available_size);
+        // let required = Size::new(self.texture.width() as f32, self.texture.height() as f32);
+        self.sizing.calc_final_size(available, available)
     }
 
-    fn arrange(&mut self, final_rect: Rect, children: &[Component]) -> Rect {
+    fn arrange(&mut self, final_rect: Rect) -> Rect {
         self.visual = Some(VisualImage::new(final_rect, &self.view));
         final_rect
     }
+}
 
+impl Draw for Image {
     fn draw<'a>(&'a self, context: &mut DrawingContext<'a>) {
         context.draw(self.visual.as_ref().unwrap());
     }
 }
+
+impl InputHandler for Image {}
+
+impl PreviewInputHandler for Image {}
+
+impl DispatchInput for Image {}
+
+impl Component for Image {}
 
 /*
    Helpers

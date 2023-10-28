@@ -37,7 +37,7 @@ impl VisualRectangle {
         Self { buffer, bind_group }
     }
 
-    pub fn update(&mut self, rect: Rect, color: ::Color) {
+    pub fn update(&self, rect: Rect, color: ::Color) {
         self.buffer.update(&RectangleUniform {
             transform: model_projection(rect, 0.0),
             color: color.into(),

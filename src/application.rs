@@ -139,21 +139,14 @@ impl<'a> Application<'a> {
                             WindowEvent::Focused(_) => {}
                             WindowEvent::KeyboardInput { input, .. } => {
                                 if let Some(key) = input.virtual_keycode {
-                                    let event = KeyEvent {
-                                        key,
-                                        state: input.state,
-                                        _phantom: (),
-                                    };
+                                    let event = KeyEvent::new(key, input.state);
                                     window.on_key(&event);
                                 }
                             }
                             WindowEvent::ModifiersChanged(_) => {}
                             WindowEvent::Ime(_) => {}
                             WindowEvent::CursorMoved { position, .. } => {
-                                let event = CursorMovedEvent {
-                                    pos: position.into(),
-                                    _phantom: (),
-                                };
+                                let event = CursorMovedEvent::new(position.into());
                                 window.on_cursor_moved(&event);
                             }
                             WindowEvent::CursorEntered { .. } => {}
@@ -165,18 +158,11 @@ impl<'a> Application<'a> {
                                         Delta::new(pos.x as f32, pos.y as f32)
                                     }
                                 };
-                                let event = MouseWheelEvent {
-                                    delta,
-                                    _phantom: (),
-                                };
+                                let event = MouseWheelEvent::new(delta);
                                 window.on_mouse_wheel(&event);
                             }
                             WindowEvent::MouseInput { button, state, .. } => {
-                                let event = MouseButtonEvent {
-                                    button,
-                                    state,
-                                    _phantom: (),
-                                };
+                                let event = MouseButtonEvent::new(button, state);
                                 window.on_mouse_button(&event);
                             }
                             WindowEvent::TouchpadMagnify { .. } => {}

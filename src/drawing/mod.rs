@@ -27,11 +27,15 @@ pub trait Visual {
 
 pub struct DrawingContext<'a> {
     render_pass: wgpu::RenderPass<'a>,
+    scissor_stack: Vec<Rect>,
 }
 
 impl<'a> DrawingContext<'a> {
-    pub(crate) fn new(render_pass: wgpu::RenderPass<'a>) -> Self {
-        Self { render_pass }
+    pub(crate) fn new(render_pass: wgpu::RenderPass<'a>, initial_scissor: Rect) -> Self {
+        Self {
+            render_pass,
+            scissor_stack: vec![initial_scissor],
+        }
     }
 
     #[inline]
@@ -40,6 +44,27 @@ impl<'a> DrawingContext<'a> {
         D: Visual,
     {
         drawable.draw(&mut self.render_pass)
+    }
+
+    pub fn push_scissor(&mut self, rect: Rect) {
+        self.render_pass.set_scissor_rect(
+            rect.pos.x as u32,
+            rect.pos.y as u32,
+            rect.size.width as u32,
+            rect.size.height as u32,
+        );
+        self.scissor_stack.push(rect);
+    }
+
+    pub fn pop_scissor(&mut self) {
+        self.scissor_stack.pop();
+        let scissor = self.scissor_stack.last().unwrap();
+        self.render_pass.set_scissor_rect(
+            scissor.pos.x as u32,
+            scissor.pos.y as u32,
+            scissor.size.width as u32,
+            scissor.size.height as u32,
+        );
     }
 }
 
@@ -121,7 +146,7 @@ where
         }
     }
 
-    pub fn update(&mut self, data: &T) {
+    pub fn update(&self, data: &T) {
         get_queue().write_buffer(&self.buffer, 0, unsafe { to_slice(data) });
     }
 }
@@ -162,7 +187,7 @@ where
         }
     }
 
-    pub fn update(&mut self, data: &T) {
+    pub fn update(&self, data: &T) {
         self.buffer.update(data);
     }
 }
