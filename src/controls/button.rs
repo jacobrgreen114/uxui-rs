@@ -107,12 +107,7 @@ impl Draw for Button {
 
 impl PreviewInputHandler for Button {}
 
-impl InputHandler for Button {
-    fn on_cursor_moved(&mut self, event: &CursorMovedEvent) -> bool {
-        println!("Button cursor moved: {:?}", event);
-        false
-    }
-}
+impl InputHandler for Button {}
 
 impl DispatchInput for Button {
     fn dispatch_key(&mut self, event: &KeyEvent) -> bool {

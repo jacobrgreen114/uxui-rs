@@ -1,6 +1,4 @@
 use std::cell::Cell;
-use std::convert::TryFrom;
-use std::ops::Deref;
 use {image, Size};
 
 use component::*;
@@ -9,6 +7,7 @@ use input_handling::*;
 use {Rect, Sizing};
 
 use gfx::{get_device, get_queue};
+
 use image::EncodableLayout;
 use num_traits::Zero;
 use std::path::Path;
@@ -53,7 +52,7 @@ impl Builder<Image> for ImageBuilder<'_> {
 
         Image {
             sizing: self.sizing,
-            texture,
+            // texture,
             view,
             visual: None,
             final_size: Cell::new(Size::zero()),
@@ -68,7 +67,7 @@ impl Builder<Image> for ImageBuilder<'_> {
 #[derive(Debug)]
 pub struct Image {
     sizing: Sizing,
-    texture: wgpu::Texture,
+    // texture: wgpu::Texture,
     view: wgpu::TextureView,
     visual: Option<VisualImage>,
     final_size: Cell<Size>,

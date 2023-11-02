@@ -3,7 +3,7 @@ use component::Component;
 use std::ops::Deref;
 use Point;
 
-type Key = winit::event::VirtualKeyCode;
+type Key = winit::keyboard::PhysicalKey;
 type KeyState = winit::event::ElementState;
 
 type MouseButton = winit::event::MouseButton;

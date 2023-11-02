@@ -7,14 +7,15 @@ use std::collections::HashMap;
 
 use winit::event::{Event, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::*;
-use winit::platform::run_return::EventLoopExtRunReturn;
+use winit::platform;
+use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 
 /* Application */
 
 pub enum RunMode {
     Wait,
     WaitTimeout(std::time::Duration),
-    WaitTill(std::time::Instant),
+    WaitUntill(std::time::Instant),
     Poll,
 }
 
@@ -86,130 +87,133 @@ impl<'a> Application<'a> {
         let mut controller = C::new();
         let mut app = ApplicationData::new();
 
-        event_loop.run_return(move |event, event_loop, flow| {
-            match event {
-                Event::NewEvents(cause) => match cause {
-                    StartCause::Init => {
-                        controller.on_start(&mut Application::new(&mut app, &event_loop));
-                    }
-                    StartCause::Poll => {
-                        controller.on_poll();
-
-                        for window in app.windows.values_mut() {
-                            window.poll();
+        event_loop
+            .unwrap()
+            .run(move |event, event_loop| {
+                match event {
+                    Event::NewEvents(cause) => match cause {
+                        StartCause::Init => {
+                            controller.on_start(&mut Application::new(&mut app, &event_loop));
                         }
-                    }
-                    StartCause::ResumeTimeReached { .. } => {
-                        controller.on_poll();
+                        StartCause::Poll => {
+                            controller.on_poll();
 
-                        for window in app.windows.values_mut() {
-                            window.poll();
-                        }
-                    }
-                    StartCause::WaitCancelled { .. } => {
-                        controller.on_poll();
-
-                        for window in app.windows.values_mut() {
-                            window.poll();
-                        }
-                    }
-                },
-                Event::WindowEvent { event, window_id } => {
-                    if let Some(window) = app.windows.get_mut(&window_id) {
-                        match event {
-                            WindowEvent::Resized(size) => {
-                                window.resized(size.into());
+                            for window in app.windows.values_mut() {
+                                window.poll();
                             }
-                            WindowEvent::Moved(pos) => {
-                                window.moved(pos.into());
+                        }
+                        StartCause::ResumeTimeReached { .. } => {
+                            controller.on_poll();
+
+                            for window in app.windows.values_mut() {
+                                window.poll();
                             }
-                            WindowEvent::CloseRequested => {
-                                if window.close_requested() {
-                                    window.close()
+                        }
+                        StartCause::WaitCancelled { .. } => {
+                            controller.on_poll();
+
+                            for window in app.windows.values_mut() {
+                                window.poll();
+                            }
+                        }
+                    },
+                    Event::WindowEvent { event, window_id } => {
+                        if let Some(window) = app.windows.get_mut(&window_id) {
+                            match event {
+                                WindowEvent::Resized(size) => {
+                                    window.resized(size.into());
                                 }
-                            }
-                            WindowEvent::Destroyed => {
-                                let mut window = app.windows.remove(&window_id).unwrap();
-                                window.closed();
-                            }
-                            WindowEvent::DroppedFile(_) => {}
-                            WindowEvent::HoveredFile(_) => {}
-                            WindowEvent::HoveredFileCancelled => {}
-                            WindowEvent::ReceivedCharacter(char) => {}
-                            WindowEvent::Focused(_) => {}
-                            WindowEvent::KeyboardInput { input, .. } => {
-                                if let Some(key) = input.virtual_keycode {
-                                    let event = KeyEvent::new(key, input.state);
+                                WindowEvent::Moved(pos) => {
+                                    window.moved(pos.into());
+                                }
+                                WindowEvent::CloseRequested => {
+                                    if window.close_requested() {
+                                        window.close()
+                                    }
+                                }
+                                WindowEvent::Destroyed => {
+                                    let mut window = app.windows.remove(&window_id).unwrap();
+                                    window.closed();
+                                }
+                                WindowEvent::DroppedFile(_) => {}
+                                WindowEvent::HoveredFile(_) => {}
+                                WindowEvent::HoveredFileCancelled => {}
+                                // WindowEvent::ReceivedCharacter(char) => {}
+                                WindowEvent::Focused(_) => {}
+                                WindowEvent::KeyboardInput { event, .. } => {
+                                    let event = KeyEvent::new(event.physical_key, event.state);
                                     window.on_key(&event);
                                 }
+                                WindowEvent::ModifiersChanged(_) => {}
+                                WindowEvent::Ime(_) => {}
+                                WindowEvent::CursorMoved { position, .. } => {
+                                    let event = CursorMovedEvent::new(position.into());
+                                    window.on_cursor_moved(&event);
+                                }
+                                WindowEvent::CursorEntered { .. } => {}
+                                WindowEvent::CursorLeft { .. } => {}
+                                WindowEvent::MouseWheel { delta, .. } => {
+                                    let delta = match delta {
+                                        MouseScrollDelta::LineDelta(x, y) => Delta::new(x, y),
+                                        MouseScrollDelta::PixelDelta(pos) => {
+                                            Delta::new(pos.x as f32, pos.y as f32)
+                                        }
+                                    };
+                                    let event = MouseWheelEvent::new(delta);
+                                    window.on_mouse_wheel(&event);
+                                }
+                                WindowEvent::MouseInput { button, state, .. } => {
+                                    let event = MouseButtonEvent::new(button, state);
+                                    window.on_mouse_button(&event);
+                                }
+                                WindowEvent::TouchpadMagnify { .. } => {}
+                                WindowEvent::SmartMagnify { .. } => {}
+                                WindowEvent::TouchpadRotate { .. } => {}
+                                WindowEvent::TouchpadPressure { .. } => {}
+                                WindowEvent::AxisMotion { .. } => {}
+                                WindowEvent::Touch(_) => {}
+                                WindowEvent::ScaleFactorChanged { .. } => {}
+                                WindowEvent::ThemeChanged(_) => {}
+                                WindowEvent::Occluded(_) => {}
+                                WindowEvent::ActivationTokenDone { .. } => {}
+                                WindowEvent::RedrawRequested => {
+                                    window.redraw_requested();
+                                }
                             }
-                            WindowEvent::ModifiersChanged(_) => {}
-                            WindowEvent::Ime(_) => {}
-                            WindowEvent::CursorMoved { position, .. } => {
-                                let event = CursorMovedEvent::new(position.into());
-                                window.on_cursor_moved(&event);
-                            }
-                            WindowEvent::CursorEntered { .. } => {}
-                            WindowEvent::CursorLeft { .. } => {}
-                            WindowEvent::MouseWheel { delta, .. } => {
-                                let delta = match delta {
-                                    MouseScrollDelta::LineDelta(x, y) => Delta::new(x, y),
-                                    MouseScrollDelta::PixelDelta(pos) => {
-                                        Delta::new(pos.x as f32, pos.y as f32)
-                                    }
-                                };
-                                let event = MouseWheelEvent::new(delta);
-                                window.on_mouse_wheel(&event);
-                            }
-                            WindowEvent::MouseInput { button, state, .. } => {
-                                let event = MouseButtonEvent::new(button, state);
-                                window.on_mouse_button(&event);
-                            }
-                            WindowEvent::TouchpadMagnify { .. } => {}
-                            WindowEvent::SmartMagnify { .. } => {}
-                            WindowEvent::TouchpadRotate { .. } => {}
-                            WindowEvent::TouchpadPressure { .. } => {}
-                            WindowEvent::AxisMotion { .. } => {}
-                            WindowEvent::Touch(_) => {}
-                            WindowEvent::ScaleFactorChanged { .. } => {}
-                            WindowEvent::ThemeChanged(_) => {}
-                            WindowEvent::Occluded(_) => {}
+                        } else {
+                            panic!("Event for unknown window");
                         }
-                    } else {
-                        panic!("Event for unknown window");
+                    }
+                    Event::DeviceEvent { .. } => {}
+                    Event::UserEvent(_) => {}
+                    Event::Suspended => {}
+                    Event::Resumed => {}
+                    Event::AboutToWait => {}
+                    Event::LoopExiting => {}
+                    Event::MemoryWarning => {}
+                }
+
+                match controller.run_mode() {
+                    RunMode::Wait => {
+                        event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait)
+                    }
+                    RunMode::WaitTimeout(duration) => event_loop
+                        .set_control_flow(winit::event_loop::ControlFlow::wait_duration(duration)),
+                    RunMode::WaitUntill(instant) => event_loop
+                        .set_control_flow(winit::event_loop::ControlFlow::WaitUntil(instant)),
+                    RunMode::Poll => {
+                        event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll)
                     }
                 }
-                Event::DeviceEvent { .. } => {}
-                Event::UserEvent(_) => {}
-                Event::Suspended => {}
-                Event::Resumed => {}
-                Event::MainEventsCleared => {}
-                Event::RedrawRequested(window_id) => {
-                    // println!("Redraw");
-                    if let Some(window) = app.windows.get_mut(&window_id) {
-                        window.redraw_requested();
-                    } else {
-                        panic!("Redraw requested for unknown window");
-                    }
+
+                if match controller.exit_mode() {
+                    ExitMode::Explicit => controller.should_exit(),
+                    ExitMode::LastWindowClosed => app.windows.is_empty(),
+                } {
+                    event_loop.exit();
                 }
-                Event::RedrawEventsCleared => {}
-                Event::LoopDestroyed => {}
-            }
-
-            match controller.run_mode() {
-                RunMode::Wait => flow.set_wait(),
-                RunMode::WaitTimeout(duration) => flow.set_wait_timeout(duration),
-                RunMode::WaitTill(instant) => flow.set_wait_until(instant),
-                RunMode::Poll => flow.set_poll(),
-            }
-
-            if match controller.exit_mode() {
-                ExitMode::Explicit => controller.should_exit(),
-                ExitMode::LastWindowClosed => app.windows.is_empty(),
-            } {
-                flow.set_exit();
-            }
-        });
+            })
+            .unwrap();
     }
 }
 
