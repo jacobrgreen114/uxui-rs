@@ -296,12 +296,12 @@ impl Window {
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(clear_color),
-                        store: true,
+                        store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
-                // timestamp_writes: None,
-                // occlusion_query_set: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
             render_pass.set_bind_group(0, &bind_group, &[]);
