@@ -43,7 +43,7 @@ use std::sync::Arc;
 use glm::Vec4;
 use winit::dpi::PhysicalPosition;
 
-pub use num_traits::*;
+// pub use num_traits::*;
 
 pub struct StringProperty {
     value: Arc<String>,

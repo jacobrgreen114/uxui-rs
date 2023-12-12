@@ -20,6 +20,7 @@ use drawing::DrawingContext;
 use input_handling::*;
 
 use std::cell::Cell;
+use num_traits::Zero;
 
 #[derive(Debug, Default)]
 pub struct DockBuilder {

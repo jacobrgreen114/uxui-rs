@@ -19,6 +19,7 @@ use crate::drawing::*;
 use crate::*;
 use input_handling::*;
 use std::cell::Cell;
+use num_traits::Zero;
 
 #[derive(Debug)]
 struct ColumnChild {

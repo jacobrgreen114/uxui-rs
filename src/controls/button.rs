@@ -18,6 +18,7 @@ use crate::drawing::*;
 use crate::*;
 use input_handling::*;
 use std::cell::*;
+use num_traits::Zero;
 
 use crate::component::*;
 
