@@ -30,7 +30,7 @@ use uxui::controls::*;
 use uxui::layouts::*;
 use uxui::*;
 
-const UXUI_LOGO_IMG: &[u8] = include_bytes!("../assets/uxui_logo.png");
+static UXUI_LOGO_IMG: &[u8] = include_bytes!("../assets/uxui_logo.png");
 
 lazy_static! {
     static ref START_TIME: Instant = Instant::now();
@@ -132,18 +132,6 @@ impl WindowController for ExampleWindowController {
     }
 }
 
-static LOGIN_WINDOW_CONFIG: WindowConfig = WindowConfig {
-    title: Some("Login"),
-    size: Some(Size {
-        width: 800.0,
-        height: 600.0,
-    }),
-    pos: None,
-    decorations: true,
-    resizable: true,
-    transparent: false,
-};
-
 struct ExampleAppController {}
 
 impl ApplicationController for ExampleAppController {
@@ -154,7 +142,18 @@ impl ApplicationController for ExampleAppController {
     fn on_start(&mut self, app: &mut Application) {
         app.push_window(Window::new(
             app,
-            &LOGIN_WINDOW_CONFIG,
+            &WindowConfig {
+                title: Some("Login"),
+                size: Some(Size {
+                    width: 800.0,
+                    height: 600.0,
+                }),
+                pos: None,
+                decorations: true,
+                resizable: true,
+                transparent: false,
+                icon: Some(WindowIcon::from_bytes(UXUI_LOGO_IMG)),
+            },
             ExampleWindowController::new(),
         ));
     }

@@ -24,13 +24,13 @@ use std::cell::{Ref, RefCell};
 
 use glm::ext::*;
 use glm::*;
+use image::RgbaImage;
 use num_traits::identities::One;
 
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::window::*;
 
 use wgpu::*;
-use wgpu::core::command::TransferError::TextureFormatsNotCopyCompatible;
 
 pub trait WindowController {
     fn on_create(&mut self, _window: &Window) {}
@@ -48,6 +48,17 @@ pub trait WindowController {
     fn on_poll(&mut self, _window: &Window) {}
 }
 
+pub struct WindowIcon {
+    image: RgbaImage,
+}
+
+impl WindowIcon {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let image = image::load_from_memory(bytes).unwrap().to_rgba8();
+        Self { image }
+    }
+}
+
 pub struct WindowConfig<'a> {
     pub title: Option<&'a str>,
     pub size: Option<Size>,
@@ -55,6 +66,7 @@ pub struct WindowConfig<'a> {
     pub resizable: bool,
     pub decorations: bool,
     pub transparent: bool,
+    pub icon: Option<WindowIcon>,
 }
 
 impl Default for WindowConfig<'_> {
@@ -66,6 +78,7 @@ impl Default for WindowConfig<'_> {
             resizable: true,
             decorations: true,
             transparent: false,
+            icon: None,
         }
     }
 }
@@ -95,6 +108,14 @@ impl WindowConfig<'_> {
 
         builder = match self.pos {
             Some(pos) => builder.with_position(LogicalPosition::new(pos.x, pos.y)),
+            None => builder,
+        };
+
+        builder = match &self.icon {
+            Some(icon) => builder.with_window_icon(Some(
+                Icon::from_rgba(icon.image.to_vec(), icon.image.width(), icon.image.height())
+                    .unwrap(),
+            )),
             None => builder,
         };
 

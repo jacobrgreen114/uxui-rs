@@ -86,6 +86,8 @@ impl Default for BindableString {
 
 pub trait Builder<T: component::Component>: Sized {
     fn build(self) -> T;
+
+    #[inline]
     fn build_boxed(self) -> Box<T> {
         Box::new(self.build())
     }
