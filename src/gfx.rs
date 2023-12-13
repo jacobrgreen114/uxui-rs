@@ -15,11 +15,13 @@
 */
 
 use lazy_static::lazy_static;
-use std::time::Instant;
 use wgpu::*;
 
 lazy_static! {
-    static ref INSTANCE: Instance = Instance::default();
+    static ref INSTANCE: Instance = Instance::new(InstanceDescriptor {
+        backends: Backends::VULKAN,
+        ..Default::default()
+    });
     static ref ADAPTER: Adapter =
         futures::executor::block_on(get_instance().request_adapter(&RequestAdapterOptions {
             power_preference: PowerPreference::None,
@@ -31,7 +33,7 @@ lazy_static! {
         futures::executor::block_on(get_adapter().request_device(
             &DeviceDescriptor {
                 label: Some("Uxui device"),
-                features: Features::default(),
+                features: Features::default() | Features::SPIRV_SHADER_PASSTHROUGH,
                 limits: Limits::default(),
             },
             None,

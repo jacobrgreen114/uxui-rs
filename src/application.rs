@@ -14,17 +14,15 @@
   limitations under the License.
 */
 
-use super::window::*;
 use super::*;
+use super::window::*;
 
 use crate::input_handling::*;
 
 use std::collections::HashMap;
 
-use winit::event::{Event, MouseScrollDelta, StartCause, WindowEvent};
+use winit::event::*;
 use winit::event_loop::*;
-use winit::platform;
-use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
 
 /* Application */
 
@@ -157,7 +155,10 @@ impl<'a> Application<'a> {
                                 // WindowEvent::ReceivedCharacter(char) => {}
                                 WindowEvent::Focused(_) => {}
                                 WindowEvent::KeyboardInput { event, .. } => {
-                                    let event = KeyEvent::new(event.physical_key, event.state);
+                                    let event = input_handling::KeyEvent::new(
+                                        event.physical_key,
+                                        event.state,
+                                    );
                                     window.on_key(&event);
                                 }
                                 WindowEvent::ModifiersChanged(_) => {}

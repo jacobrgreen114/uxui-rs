@@ -56,7 +56,7 @@ impl Scene {
         let this = Self {
             controller: RefCell::new(Box::new(controller)),
             root: UnsafeCell::new(None),
-            background_color: Color::new_rgb(1.0, 1.0, 1.0),
+            background_color: Color::rgb(1.0, 1.0, 1.0),
             layout_dirty: true,
         };
         this.controller.borrow_mut().on_init(&this);

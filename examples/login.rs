@@ -19,6 +19,7 @@
 
 extern crate lazy_static;
 extern crate uxui;
+extern crate wgpu;
 
 use std::rc::Rc;
 use std::time::Instant;
@@ -88,7 +89,7 @@ impl SceneController for LoginSceneController {
                 Button::builder()
                     //.with_content(Text::new("Login"))
                     .with_sizing(Sizing::fixed(Size::new(100.0, 50.0)))
-                    .with_background(Color::new_rgb(0.0, 1.0, 0.0))
+                    .with_background(Color::GREEN)
                     //.with_action(Box::new(move || {
                     //    model.on_login();
                     //}))

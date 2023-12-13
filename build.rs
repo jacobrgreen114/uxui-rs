@@ -64,7 +64,7 @@ fn main() {
 fn compile_shader(source_path: &Path, output_path: &Path, dep_path: &Path) {
     let mut command = Command::new("glslc");
     // #[cfg(not(debug_assertions))]
-    // command.arg("-O");
+    command.arg("-O");
     command
         .arg("-MD")
         .arg("-MF")

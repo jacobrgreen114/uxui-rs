@@ -156,14 +156,14 @@ impl Visual for VisualText {
 }
 
 lazy_static! {
-    static ref GLYPH_VERTEX_SHADER: wgpu::ShaderModule = {
-        get_device().create_shader_module(include_spirv!(concat!(
+    static ref GLYPH_VERTEX_SHADER: wgpu::ShaderModule = unsafe {
+        get_device().create_shader_module_spirv(&include_spirv_raw!(concat!(
             env!("OUT_DIR"),
             "/shaders/glyph_sdf.vert.spv"
         )))
     };
-    static ref GLYPH_FRAGMENT_SHADER: wgpu::ShaderModule = {
-        get_device().create_shader_module(include_spirv!(concat!(
+    static ref GLYPH_FRAGMENT_SHADER: wgpu::ShaderModule = unsafe {
+        get_device().create_shader_module_spirv(&include_spirv_raw!(concat!(
             env!("OUT_DIR"),
             "/shaders/glyph_sdf.frag.spv"
         )))

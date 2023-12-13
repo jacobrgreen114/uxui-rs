@@ -95,14 +95,14 @@ fn draw_quad<'a>(
 }
 
 lazy_static! {
-    static ref IMAGE_VERTEX_SHADER: wgpu::ShaderModule = {
-        get_device().create_shader_module(include_spirv!(concat!(
+    static ref IMAGE_VERTEX_SHADER: wgpu::ShaderModule = unsafe {
+        get_device().create_shader_module_spirv(&include_spirv_raw!(concat!(
             env!("OUT_DIR"),
             "/shaders/image.vert.spv"
         )))
     };
-    static ref IMAGE_FRAGMENT_SHADER: wgpu::ShaderModule = {
-        get_device().create_shader_module(include_spirv!(concat!(
+    static ref IMAGE_FRAGMENT_SHADER: wgpu::ShaderModule = unsafe {
+        get_device().create_shader_module_spirv(&include_spirv_raw!(concat!(
             env!("OUT_DIR"),
             "/shaders/image.frag.spv"
         )))

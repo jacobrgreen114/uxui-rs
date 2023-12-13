@@ -82,7 +82,7 @@ impl Button {
         ButtonBuilder {
             content: None,
             sizing: Sizing::fixed(Size::new(16.0, 16.0)),
-            background: Color::new_grayscale(0.9),
+            background: Color::grey(0.9),
         }
     }
 }

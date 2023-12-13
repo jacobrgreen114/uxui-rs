@@ -21,8 +21,6 @@ use crate::scene::*;
 use crate::*;
 
 use std::cell::{Ref, RefCell};
-use std::ffi::c_void;
-use std::ops::Deref;
 
 use glm::ext::*;
 use glm::*;
@@ -31,8 +29,8 @@ use num_traits::identities::One;
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::window::*;
 
-use crate::input_handling::*;
 use wgpu::*;
+use wgpu::core::command::TransferError::TextureFormatsNotCopyCompatible;
 
 pub trait WindowController {
     fn on_create(&mut self, _window: &Window) {}
@@ -331,6 +329,7 @@ impl Window {
 
         let command = encoder.finish();
 
+        self.window.as_ref().unwrap().pre_present_notify();
         get_queue().submit(Some(command));
         texture.present();
     }
